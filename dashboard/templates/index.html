@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Air Quality Dashboard</title>
+</head>
+<body>
+    <h1>Latest Air Quality Data</h1>
+    <table border="1">
+        <tr>
+            <th>Timestamp</th>
+            <th>PM2.5</th>
+            <th>PM10</th>
+            <th>CO2</th>
+            <th>Temperature</th>
+            <th>Humidity</th>
+        </tr>
+        {% for row in data.itertuples() %}
+        <tr>
+            <td>{{ row.timestamp }}</td>
+            <td>{{ row.pm25 }}</td>
+            <td>{{ row.pm10 }}</td>
+            <td>{{ row.co2 }}</td>
+            <td>{{ row.temperature }}</td>
+            <td>{{ row.humidity }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
