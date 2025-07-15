@@ -5,12 +5,15 @@
      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <div style="margin-bottom: 20px;">
+        <a href="/simulate" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔧 Sensor Simulator</a>
+    </div>
     <h1>Latest Air Quality Data</h1>
      <canvas id="pmChart" width="400" height="200"></canvas>
     <canvas id="tempChart" width="400" height="200"></canvas>
 
     <script>
-    const data = {{ data | tojson | safe }};
+    const data = /* {{ data | tojson | safe }} */ [];
     const timestamps = data.map(entry => entry.timestamp);
     const pm25 = data.map(entry => entry.pm25);
     const temperature = data.map(entry => entry.temperature);
@@ -50,7 +53,7 @@
             <th>Temperature</th>
             <th>Humidity</th>
         </tr>
-        {% for row in data.itertuples() %}
+        {% for row in data %}
         <tr>
             <td>{{ row.timestamp }}</td>
             <td>{{ row.pm25 }}</td>
