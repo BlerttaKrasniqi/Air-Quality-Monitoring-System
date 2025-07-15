@@ -1,0 +1,70 @@
+# Core dependencies
+flask==2.3.3
+kafka-python==2.0.2
+cassandra-driver==3.28.0
+pandas==2.0.3
+numpy==1.24.3
+
+# Data generation and simulation
+faker==19.3.1
+
+# Real-time processing
+pyspark==3.4.1
+pyspark-sql==3.4.1
+pyspark-streaming==3.4.1
+
+# Web and API
+requests==2.31.0
+flask-cors==4.0.0
+
+# Data visualization
+matplotlib==3.7.2
+seaborn==0.12.2
+plotly==5.15.0
+
+# Machine learning (for future enhancements)
+scikit-learn==1.3.0
+scipy==1.11.1
+
+# Utilities
+python-dotenv==1.0.0
+psutil==5.9.5
+schedule==1.2.0
+
+# Development and testing
+pytest==7.4.0
+pytest-cov==4.1.0
+black==23.7.0
+flake8==6.0.0
+
+# Logging and monitoring
+structlog==23.1.0
+prometheus-client==0.17.1
+
+# Database
+redis==4.6.0
+sqlalchemy==2.0.19
+
+# Time and date handling
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Configuration
+pyyaml==6.0.1
+configparser==5.3.0
+
+# Async support
+asyncio-mqtt==0.13.0
+aiohttp==3.8.5
+
+# Data validation
+pydantic==2.1.1
+marshmallow==3.20.1
+
+# Security
+cryptography==41.0.3
+bcrypt==4.0.1
+
+# Performance monitoring
+memory-profiler==0.61.0
+line-profiler==4.1.1 
