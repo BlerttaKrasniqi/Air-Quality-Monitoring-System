@@ -1,0 +1,7 @@
+flask
+cassandra-driver
+pandas
+pydeck
+jsonschema-specifications
+gitpython
+altair
