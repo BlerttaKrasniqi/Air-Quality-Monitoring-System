@@ -5,9 +5,14 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
     ports:
       - "2181:2181"
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.4.0
     depends_on:
       - zookeeper
     ports:
@@ -16,21 +21,64 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:9092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
   cassandra:
     image: cassandra:latest
     ports:
       - "9042:9042"
 
-  spark:
-    image: bitnami/spark:latest
+    mem_limit: 1g
+    environment:
+      - MAX_HEAP_SIZE=512M
+      - HEAP_NEWSIZE=100M
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  spark-master:
+    image: bitnami/spark:3.5.1
     environment:
       - SPARK_MODE=master
     ports:
-      - "8081:8080"
+      - "8080:8080"
+      - "127.0.0.1:7077:7077"
     volumes:
-      - ./spark_app:/opt/spark_app
+      - ./stream_processor:/opt/spark_app
+    command: ["/opt/bitnami/scripts/spark/entrypoint.sh", "/opt/bitnami/scripts/spark/run.sh"]
+
+  spark-worker:
+    image: bitnami/spark:3.5.1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
+    command: ["/bin/bash", "-c", "mkdir -p /tmp/home && export HOME=/tmp/home && /opt/bitnami/scripts/spark/entrypoint.sh /opt/bitnami/scripts/spark/run.sh"]
+
+  spark-submit:
+    image: bitnami/spark:3.5.1
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      spark-master:
+        condition: service_started
+      spark-worker:
+        condition: service_started
+    volumes:
+      - ./stream_processor:/opt/spark_app
+    command: ["/bin/bash", "-c", "mkdir -p /tmp/home && export HOME=/tmp/home && spark-submit --master spark://spark-master:7077 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,com.datastax.spark:spark-cassandra-connector_2.12:3.2.0 --conf spark.jars.ivy=/tmp /opt/spark_app/stream_processor.py"]
 
   simulator:
     build: ./sensor_simulator
