@@ -1,14 +1,14 @@
-# Core dependencies
+
 flask==2.3.3
 kafka-python==2.0.2
 cassandra-driver==3.28.0
 pandas==2.0.3
 numpy==1.24.3
 
-# Data generation and simulation
+
 faker==19.3.1
 
-# Real-time processing
+
 pyspark==3.4.1
 pyspark-sql==3.4.1
 pyspark-streaming==3.4.1

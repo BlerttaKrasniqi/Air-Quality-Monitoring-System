@@ -58,14 +58,7 @@ class SmartAirQualitySensor:
             'humidity': deque(maxlen=100)
         }
         
-        # Initialize realistic baseline values
-        self.state = {
-            "pm25": self._get_baseline_pm25(),
-            "pm10": self._get_baseline_pm10(),
-            "co2": self._get_baseline_co2(),
-            "humidity": self._get_baseline_humidity(),
-            "temperature": self._get_baseline_temperature()
-        }
+
         
         # Event simulation
         self.active_events = []
@@ -88,6 +81,15 @@ class SmartAirQualitySensor:
         self.weather_cycle = 0
         self.season = self._get_current_season()
         
+        # Initialize realistic baseline values (moved after season is set)
+        self.state = {
+            "pm25": self._get_baseline_pm25(),
+            "pm10": self._get_baseline_pm10(),
+            "co2": self._get_baseline_co2(),
+            "humidity": self._get_baseline_humidity(),
+            "temperature": self._get_baseline_temperature()
+        }
+        
         # Start background event simulation
         self.event_thread = threading.Thread(target=self._event_simulation_loop, daemon=True)
         self.event_thread.start()
@@ -97,54 +99,66 @@ class SmartAirQualitySensor:
         logger.info(f"🏭 Industrial zones: {len(self.industrial_zones)}")
     
     def _generate_location_config(self):
-        """Generate realistic location configuration."""
+        """Generate realistic location configuration for Kosovo."""
         locations = [
             {
-                'city': 'New York',
-                'latitude': 40.7128,
-                'longitude': -74.0060,
-                'elevation': 10,
-                'population_density': 'very_high',
-                'industrial_zones': [
-                    {'lat': 40.7500, 'lng': -74.0000, 'type': 'manufacturing'},
-                    {'lat': 40.7000, 'lng': -74.0500, 'type': 'chemical'},
-                    {'lat': 40.6500, 'lng': -74.1000, 'type': 'power_plant'}
-                ]
-            },
-            {
-                'city': 'Los Angeles',
-                'latitude': 34.0522,
-                'longitude': -118.2437,
-                'elevation': 93,
+                'city': 'Pristina',
+                'latitude': 42.6629,
+                'longitude': 21.1655,
+                'elevation': 652,
                 'population_density': 'high',
                 'industrial_zones': [
-                    {'lat': 34.0000, 'lng': -118.2000, 'type': 'refinery'},
-                    {'lat': 33.9500, 'lng': -118.2500, 'type': 'manufacturing'},
-                    {'lat': 34.1000, 'lng': -118.3000, 'type': 'power_plant'}
+                    {'lat': 42.6500, 'lng': 21.1500, 'type': 'manufacturing'},
+                    {'lat': 42.6700, 'lng': 21.1800, 'type': 'power_plant'},
+                    {'lat': 42.6400, 'lng': 21.1600, 'type': 'construction'}
                 ]
             },
             {
-                'city': 'Chicago',
-                'latitude': 41.8781,
-                'longitude': -87.6298,
-                'elevation': 176,
-                'population_density': 'high',
-                'industrial_zones': [
-                    {'lat': 41.8000, 'lng': -87.6000, 'type': 'steel_mill'},
-                    {'lat': 41.7500, 'lng': -87.6500, 'type': 'chemical'},
-                    {'lat': 41.8500, 'lng': -87.7000, 'type': 'power_plant'}
-                ]
-            },
-            {
-                'city': 'Seattle',
-                'latitude': 47.6062,
-                'longitude': -122.3321,
-                'elevation': 20,
+                'city': 'Prizren',
+                'latitude': 42.2139,
+                'longitude': 20.7394,
+                'elevation': 450,
                 'population_density': 'moderate',
                 'industrial_zones': [
-                    {'lat': 47.5000, 'lng': -122.3000, 'type': 'manufacturing'},
-                    {'lat': 47.4500, 'lng': -122.3500, 'type': 'shipyard'},
-                    {'lat': 47.5500, 'lng': -122.4000, 'type': 'power_plant'}
+                    {'lat': 42.2000, 'lng': 20.7500, 'type': 'manufacturing'},
+                    {'lat': 42.2200, 'lng': 20.7300, 'type': 'textile'},
+                    {'lat': 42.2100, 'lng': 20.7400, 'type': 'food_processing'}
+                ]
+            },
+            {
+                'city': 'Peja',
+                'latitude': 42.6598,
+                'longitude': 20.2883,
+                'elevation': 550,
+                'population_density': 'moderate',
+                'industrial_zones': [
+                    {'lat': 42.6500, 'lng': 20.3000, 'type': 'manufacturing'},
+                    {'lat': 42.6700, 'lng': 20.2800, 'type': 'wood_processing'},
+                    {'lat': 42.6600, 'lng': 20.2900, 'type': 'construction'}
+                ]
+            },
+            {
+                'city': 'Gjilan',
+                'latitude': 42.4634,
+                'longitude': 21.4694,
+                'elevation': 508,
+                'population_density': 'moderate',
+                'industrial_zones': [
+                    {'lat': 42.4600, 'lng': 21.4800, 'type': 'manufacturing'},
+                    {'lat': 42.4700, 'lng': 21.4600, 'type': 'agricultural'},
+                    {'lat': 42.4650, 'lng': 21.4700, 'type': 'food_processing'}
+                ]
+            },
+            {
+                'city': 'Mitrovica',
+                'latitude': 42.8833,
+                'longitude': 20.8667,
+                'elevation': 500,
+                'population_density': 'high',
+                'industrial_zones': [
+                    {'lat': 42.8800, 'lng': 20.8700, 'type': 'mining'},
+                    {'lat': 42.8900, 'lng': 20.8600, 'type': 'manufacturing'},
+                    {'lat': 42.8850, 'lng': 20.8650, 'type': 'power_plant'}
                 ]
             }
         ]
@@ -163,14 +177,15 @@ class SmartAirQualitySensor:
             return 'autumn'
     
     def _get_baseline_pm25(self):
-        """Get baseline PM2.5 based on location and season."""
+        """Get baseline PM2.5 based on location and season for Kosovo."""
         base_values = {
-            'New York': {'winter': 25, 'spring': 20, 'summer': 15, 'autumn': 22},
-            'Los Angeles': {'winter': 30, 'spring': 25, 'summer': 35, 'autumn': 28},
-            'Chicago': {'winter': 28, 'spring': 22, 'summer': 18, 'autumn': 25},
-            'Seattle': {'winter': 15, 'spring': 12, 'summer': 10, 'autumn': 18}
+            'Pristina': {'winter': 35, 'spring': 28, 'summer': 22, 'autumn': 32},
+            'Prizren': {'winter': 30, 'spring': 25, 'summer': 20, 'autumn': 28},
+            'Peja': {'winter': 28, 'spring': 22, 'summer': 18, 'autumn': 25},
+            'Gjilan': {'winter': 32, 'spring': 26, 'summer': 21, 'autumn': 30},
+            'Mitrovica': {'winter': 38, 'spring': 30, 'summer': 25, 'autumn': 35}
         }
-        return base_values.get(self.location, {'winter': 20, 'spring': 18, 'summer': 15, 'autumn': 20})[self.season]
+        return base_values.get(self.location, {'winter': 30, 'spring': 25, 'summer': 20, 'autumn': 28})[self.season]
     
     def _get_baseline_pm10(self):
         """Get baseline PM10 (usually 1.5-2x PM2.5)."""
@@ -187,24 +202,26 @@ class SmartAirQualitySensor:
         return base_co2.get(self.location, 415)
     
     def _get_baseline_humidity(self):
-        """Get baseline humidity based on location and season."""
+        """Get baseline humidity based on location and season for Kosovo."""
         base_humidity = {
-            'New York': {'winter': 65, 'spring': 60, 'summer': 70, 'autumn': 65},
-            'Los Angeles': {'winter': 45, 'spring': 40, 'summer': 35, 'autumn': 50},
-            'Chicago': {'winter': 70, 'spring': 65, 'summer': 75, 'autumn': 70},
-            'Seattle': {'winter': 80, 'spring': 75, 'summer': 70, 'autumn': 85}
+            'Pristina': {'winter': 75, 'spring': 65, 'summer': 60, 'autumn': 70},
+            'Prizren': {'winter': 70, 'spring': 60, 'summer': 55, 'autumn': 65},
+            'Peja': {'winter': 80, 'spring': 70, 'summer': 65, 'autumn': 75},
+            'Gjilan': {'winter': 72, 'spring': 62, 'summer': 58, 'autumn': 68},
+            'Mitrovica': {'winter': 78, 'spring': 68, 'summer': 62, 'autumn': 72}
         }
-        return base_humidity.get(self.location, {'winter': 60, 'spring': 55, 'summer': 65, 'autumn': 60})[self.season]
+        return base_humidity.get(self.location, {'winter': 70, 'spring': 60, 'summer': 55, 'autumn': 65})[self.season]
     
     def _get_baseline_temperature(self):
-        """Get baseline temperature based on location and season."""
+        """Get baseline temperature based on location and season for Kosovo."""
         base_temp = {
-            'New York': {'winter': 2, 'spring': 12, 'summer': 25, 'autumn': 15},
-            'Los Angeles': {'winter': 15, 'spring': 18, 'summer': 25, 'autumn': 20},
-            'Chicago': {'winter': -5, 'spring': 10, 'summer': 23, 'autumn': 12},
-            'Seattle': {'winter': 8, 'spring': 12, 'summer': 20, 'autumn': 14}
+            'Pristina': {'winter': 2, 'spring': 15, 'summer': 25, 'autumn': 12},
+            'Prizren': {'winter': 4, 'spring': 16, 'summer': 27, 'autumn': 14},
+            'Peja': {'winter': 1, 'spring': 14, 'summer': 24, 'autumn': 11},
+            'Gjilan': {'winter': 3, 'spring': 15, 'summer': 26, 'autumn': 13},
+            'Mitrovica': {'winter': 0, 'spring': 13, 'summer': 23, 'autumn': 10}
         }
-        return base_temp.get(self.location, {'winter': 5, 'spring': 12, 'summer': 22, 'autumn': 15})[self.season]
+        return base_temp.get(self.location, {'winter': 2, 'spring': 15, 'summer': 25, 'autumn': 12})[self.season]
     
     def _update_weather_conditions(self):
         """Update weather conditions with realistic patterns."""
@@ -318,15 +335,15 @@ class SmartAirQualitySensor:
         # Seasonal base temperature
         seasonal_temp = self._get_baseline_temperature()
         
-        # Daily temperature cycle
+        # Daily temperature cycle (reduced for more realistic Kosovo temperatures)
         if 6 <= hour < 12:  # Morning warming
-            daily_cycle = (hour - 6) * 1.5
+            daily_cycle = (hour - 6) * 1.0
         elif 12 <= hour < 18:  # Afternoon peak
-            daily_cycle = 9 + (hour - 12) * 0.2
+            daily_cycle = 6 + (hour - 12) * 0.1
         elif 18 <= hour < 22:  # Evening cooling
-            daily_cycle = 9 - (hour - 18) * 1.8
+            daily_cycle = 6 - (hour - 18) * 1.2
         else:  # Night cooling
-            daily_cycle = 0 - (hour - 22) * 0.8 if hour >= 22 else 0 - (24 - hour) * 0.8
+            daily_cycle = 0 - (hour - 22) * 0.6 if hour >= 22 else 0 - (24 - hour) * 0.6
         
         # Weather effects
         weather_effects = {
@@ -665,8 +682,20 @@ class SmartAirQualitySensor:
             "data_points_generated": sum(len(history) for history in self.history.values())
         }
 
-# Global smart sensor instance
-smart_sensor = SmartAirQualitySensor()
+# Global smart sensor instance with Kosovo location
+kosovo_config = {
+    'city': 'Pristina',
+    'latitude': 42.6629,
+    'longitude': 21.1655,
+    'elevation': 652,
+    'population_density': 'high',
+    'industrial_zones': [
+        {'lat': 42.6800, 'lng': 21.1800, 'type': 'manufacturing'},
+        {'lat': 42.6500, 'lng': 21.1500, 'type': 'power_plant'},
+        {'lat': 42.6700, 'lng': 21.1700, 'type': 'chemical'}
+    ]
+}
+smart_sensor = SmartAirQualitySensor(kosovo_config)
 
 if __name__ == "__main__":
     print(f"🌬️ Smart Air Quality Sensor running in {smart_sensor.location}...")
