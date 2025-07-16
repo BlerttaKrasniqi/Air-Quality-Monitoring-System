@@ -51,7 +51,7 @@ services:
       - SPARK_MODE=master
     ports:
       - "8080:8080"
-      - "127.0.0.1:7077:7077"
+      - "7077:7077"
     volumes:
       - ./stream_processor:/opt/spark_app
     command: ["/opt/bitnami/scripts/spark/entrypoint.sh", "/opt/bitnami/scripts/spark/run.sh"]
@@ -88,6 +88,7 @@ services:
   frontend:
     build: ./dashboard
     ports:
-      - "8501:8501"
+      # - "8501:8501"
+      - "5000:5000"
     depends_on:
       - cassandra
