@@ -91,3 +91,66 @@ services:
       - "8501:8501"
     depends_on:
       - cassandra
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"  # Porti për Prometheus UI
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml  # Konfigurimi i Prometheus
+    networks:
+      - monitoring
+
+  # Grafana (visualizimi i metrikave)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"  # Porti për Grafana UI
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin  # Përdoruesi dhe fjalëkalimi për Grafana
+    volumes:
+      - grafana-storage:/var/lib/grafana  # Për ruajtjen e të dhënave të Grafana
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+
+  # Cassandra Exporter (për mbledhjen e metrikave nga Cassandra)
+  cassandra-exporter:
+    image: bitnami/cassandra-exporter:latest
+    container_name: cassandra-exporter
+    ports:
+      - "9180:9180"  # Porti për Cassandra Exporter
+    environment:
+      - CASSANDRA_URL=cassandra:9042  # URL për Cassandra
+    networks:
+      - monitoring
+
+  # Kafka Exporter (për mbledhjen e metrikave nga Kafka)
+  kafka-exporter:
+    image: bitnami/kafka-exporter:latest
+    container_name: kafka-exporter
+    ports:
+      - "9308:9308"  # Porti për Kafka Exporter
+    environment:
+      - KAFKA_SERVER=kafka:9092  # URL për Kafka
+    networks:
+      - monitoring
+
+  # Spark Exporter (për mbledhjen e metrikave nga Spark)
+  spark-exporter:
+    image: bitnami/spark-exporter:latest
+    container_name: spark-exporter
+    ports:
+      - "4040:4040"  # Porti për Spark Exporter
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  grafana-storage:
