@@ -4,14 +4,13 @@ import pandas
 import random
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'sensor_simulator'))
 from faker_sensor import faker_sensor
 
 app = Flask(__name__)
 
 @app.route("/") 
 def index():
-    cluster = Cluster(['127.0.0.1'])
+    cluster = Cluster(['cassandra'])
     session = cluster.connect('air_monitoring')
 
     rows = session.execute("SELECT * FROM sensor_data LIMIT 100;")
@@ -47,4 +46,4 @@ def simulate_event():
     return jsonify(data)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=8501)
