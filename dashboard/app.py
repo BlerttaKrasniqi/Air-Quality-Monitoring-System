@@ -8,53 +8,69 @@ from faker_sensor import faker_sensor
 from prediction_service import AirQualityPredictor
 from flask import jsonify
 import pandas as pd
-from datetime import datetime
+from sensor_simulator.sensor_simulator import SmartAirQualitySensor
+from datetime import datetime,timezone, timedelta
 
 app = Flask(__name__)
 
-@app.route("/") 
+
+kosovo_config = {
+    'city': 'Pristina',
+    'latitude': 42.6629,
+    'longitude': 21.1655,
+    'elevation': 652,
+    'population_density': 'high',
+    'industrial_zones': [
+        {'lat': 42.6800, 'lng': 21.1800, 'type': 'manufacturing'},
+        {'lat': 42.6500, 'lng': 21.1500, 'type': 'power_plant'},
+        {'lat': 42.6700, 'lng': 21.1700, 'type': 'chemical'}
+    ]
+}
+sensor = SmartAirQualitySensor(kosovo_config)
+
+@app.route("/")
 def index():
+    return render_template("index.html")
+
+@app.route("/api/realtime-data")
+def realtime_data():
     cluster = Cluster(['cassandra'])
     session = cluster.connect('air_monitoring')
 
-    rows = session.execute("SELECT * FROM sensor_data LIMIT 100;")
+    query = "SELECT * FROM sensor_data LIMIT 1"
+    rows = session.execute(query)
+    data = rows.one()
 
-    data = pandas.DataFrame(rows, columns=['id', 'pm25', 'pm10', 'co2', 'temperature', 'humidity', 'timestamp'])
-
-    if not data.empty:
-        data=data.sort_values(by='timestamp',ascending=False)
-        data['timestamp'] = data['timestamp'].astype(str)
-    
-    records = data.to_dict(orient='records')
-
-  
-
-    return render_template("smart_dashboard.html", data=records)  
-
-@app.route("/simulate")
-def simulate_page():
-    return render_template("simulate.html")
-
-@app.route("/api/sensor-data")
-def get_sensor_data():
-    """Get current sensor data"""
-    data = faker_sensor.generate_realistic_data()
-    return jsonify(data)
+    if data:
+        return jsonify({
+            "pm25": data.pm25,
+            "pm10": data.pm10,
+            "co2": data.co2,
+            "temperature": data.temperature,
+            "humidity": data.humidity,
+            "timestamp": (
+                data.timestamp.replace(tzinfo=timezone.utc)
+                            .astimezone(timezone(timedelta(hours=2)))
+                            .strftime("%Y-%m-%d %H:%M:%S")),
+            "sensor_id": data.sensor_id
+        })
+    else:
+        return jsonify({"error": "No data available"}), 404
 
 @app.route("/api/simulate-event", methods=["POST"])
 def simulate_event():
-    """Simulate an air quality event"""
     event_type = request.json.get("event_type", "normal")
-    
-    data = faker_sensor.simulate_event(event_type)
-    return jsonify(data)
+    return jsonify(sensor.simulate_event(event_type))
+
+@app.route("/api/sensor-data")
+def get_sensor_data():
+    return jsonify(sensor.generate_smart_data())
 
 predictor = AirQualityPredictor(
     model_path="models/air_quality_model.joblib", 
     scaler_path="models/air_quality_scaler.joblib"
 )
 
-# Add these routes to your Flask app
 @app.route('/api/predict', methods=['POST'])
 def predict():
     """API endpoint to get predictions based on current sensor data"""
@@ -103,4 +119,4 @@ def predict_future():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8501)
+    app.run(host="0.0.0.0", port=5000)
