@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s  # Interval për mbledhjen e metrikave
+
+scrape_configs:
+  - job_name: 'cassandra'
+    static_configs:
+      - targets: ['cassandra-exporter:9180']  # Cassandra Exporter porti
+
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka-exporter:9308']  # Kafka Exporter porti
+
+  - job_name: 'spark'
+    static_configs:
+      - targets: ['spark-exporter:4040']  # Spark Exporter porti

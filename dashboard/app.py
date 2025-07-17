@@ -1,8 +1,15 @@
 from flask import Flask, render_template, jsonify, request
 from cassandra.cluster import Cluster
+import pandas
+import random
+import sys
+import os
+from prediction_service import AirQualityPredictor
+from flask import jsonify
+import pandas as pd
 from sensor_simulator.sensor_simulator import SmartAirQualitySensor
 from datetime import datetime,timezone, timedelta
-
+import prediction_service
 app = Flask(__name__)
 
 
@@ -45,6 +52,7 @@ def realtime_data():
                             .astimezone(timezone(timedelta(hours=2)))
                             .strftime("%Y-%m-%d %H:%M:%S")),
             "sensor_id": data.sensor_id
+
         })
     else:
         return jsonify({"error": "No data available"}), 404
@@ -57,6 +65,57 @@ def simulate_event():
 @app.route("/api/sensor-data")
 def get_sensor_data():
     return jsonify(sensor.generate_smart_data())
+
+@app.route('/api/predict', methods=['POST'])
+def predict():
+    """API endpoint to get predictions based on current sensor data"""
+    try:
+        metrics = AirQualityPredictor().train(data_source='cassandra',days=30)
+        predictor = AirQualityPredictor()
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Make prediction
+        prediction = predictor.predict(data)
+        
+        return jsonify({
+            "predicted_pm25": float(prediction),
+            "timestamp": datetime.now().isoformat()
+        })
+    
+    except Exception as e:
+        app.logger.error(f"Error making prediction: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/predict_future', methods=['POST'])
+def predict_future():
+    """API endpoint to predict future air quality based on current data"""
+    try:
+        metrics = AirQualityPredictor().train(self,data_source='cassandra',days=30)
+        predictor = AirQualityPredictor()
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        hours_ahead = int(request.args.get('hours', 24))
+        
+        # Make future predictions
+        predictions = predictor.predict_future(data, hours_ahead=hours_ahead)
+        
+        # Format for response
+        formatted_predictions = []
+        for pred in predictions:
+            formatted_predictions.append({
+                "timestamp": pred["timestamp"].isoformat(),
+                "predicted_pm25": float(pred["predicted_pm25"])
+            })
+        
+        return jsonify(formatted_predictions)
+    
+    except Exception as e:
+        app.logger.error(f"Error making future predictions: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

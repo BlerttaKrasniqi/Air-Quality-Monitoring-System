@@ -1,5 +1,11 @@
 flask
 cassandra-driver
 pandas
+pydeck
+jsonschema-specifications
+gitpython
+altair
 faker
 kafka-python
+joblib
+scikit-learn
