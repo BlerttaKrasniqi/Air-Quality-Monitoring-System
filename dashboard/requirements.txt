@@ -6,6 +6,6 @@ jsonschema-specifications
 gitpython
 altair
 faker
-kafka-python>=2.0.2
+kafka-python
 joblib
 scikit-learn
