@@ -6,10 +6,7 @@
     <title>Air Quality Sensor Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<<<<<<< HEAD
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-=======
->>>>>>> main
     <style>
         body {
             background-color: #f8f9fa;
@@ -19,7 +16,6 @@
             border-radius: 10px;
             box-shadow: 0 3px 8px rgba(0,0,0,0.1);
         }
-<<<<<<< HEAD
         .chart-container {
             position: relative;
             height: 300px;
@@ -37,20 +33,15 @@
             font-weight: bold;
             color: #28a745;
         }
-=======
->>>>>>> main
     </style>
 </head>
 <body>
     <div class="container">
         <h2 class="mb-4 text-center">Smart Air Quality Sensor</h2>
-<<<<<<< HEAD
         
         <!-- Current Sensor Data -->
         <div class="row text-center mb-4" id="sensorData">
-=======
         <div class="row text-center" id="sensorData">
->>>>>>> main
             <div class="col-md-3"><div class="card sensor-card p-3 mb-3"><h5>PM2.5</h5><span id="pm25">--</span> µg/m³</div></div>
             <div class="col-md-3"><div class="card sensor-card p-3 mb-3"><h5>PM10</h5><span id="pm10">--</span> µg/m³</div></div>
             <div class="col-md-3"><div class="card sensor-card p-3 mb-3"><h5>CO₂</h5><span id="co2">--</span> ppm</div></div>
@@ -59,7 +50,6 @@
             <div class="col-md-3"><div class="card sensor-card p-3 mb-3"><h5>Sensor ID</h5><span id="sensor_id">--</span></div></div>
             <div class="col-md-6"><div class="card sensor-card p-3 mb-3"><h5>Timestamp</h5><span id="timestamp">--</span></div></div>
         </div>
-<<<<<<< HEAD
         
         <!-- AI Prediction Section -->
         <h3 class="mb-3 text-center">AI Predictions</h3>
@@ -84,38 +74,13 @@
                 </div>
             </div>
         </div>
-        
-        <!-- AI Model Management Section -->
-        <h3 class="mb-3 text-center mt-4">AI Model Management</h3>
-        <div class="row">
-            <div class="col-md-12">
-                <div class="card sensor-card p-3 mb-3">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p>Train the AI model using data from Cassandra database.</p>
-                            <p><strong>Current model:</strong> <span id="model-timestamp">Not trained</span></p>
-                            <p><strong>Model accuracy:</strong> <span id="model-accuracy">N/A</span></p>
-                        </div>
-                        <div class="col-md-6 text-end">
-                            <button class="btn btn-success mb-3" onclick="trainAIModel()">Train Model from Cassandra</button>
-                            <div id="training-status" class="status-message"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-=======
->>>>>>> main
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-<<<<<<< HEAD
         // Variable to store last model timestamp
         let lastTimestamp = null;
-        
-=======
->>>>>>> main
+      
         async function loadSensorData() {
             try {
                 const response = await axios.get("/api/realtime-data");
@@ -128,17 +93,13 @@
                 document.getElementById("humidity").innerText = data.humidity;
                 document.getElementById("sensor_id").innerText = data.sensor_id;
                 document.getElementById("timestamp").innerText = data.timestamp;
-<<<<<<< HEAD
                 
                 // After loading sensor data, update predictions
                 getPredictions(data);
-=======
->>>>>>> main
             } catch (err) {
                 console.error("Error fetching data:", err);
             }
         }
-<<<<<<< HEAD
         
         async function getPredictions(sensorData) {
             try {
@@ -420,12 +381,9 @@
             // Update data every 5 seconds
             setInterval(loadSensorData, 5000);
         });
-=======
-
        
         loadSensorData();
         setInterval(loadSensorData, 5000);
->>>>>>> main
     </script>
 </body>
 </html>

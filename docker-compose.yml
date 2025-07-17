@@ -89,7 +89,7 @@ services:
     build: ./dashboard
     ports:
       # - "8501:8501"
-      - "5000:5000"
+      - "5001:5000"
     volumes:
     - ./dashboard:/app
     - ./sensor_simulator:/app/sensor_simulator

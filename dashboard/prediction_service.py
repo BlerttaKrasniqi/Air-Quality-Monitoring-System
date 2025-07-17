@@ -22,7 +22,7 @@ CASSANDRA_HOST = ['cassandra']
 CASSANDRA_PORT = 9042
 CASSANDRA_USERNAME = '' 
 CASSANDRA_PASSWORD = ''  
-CASSANDRA_KEYSPACE = 'air_quality_monitoring'
+CASSANDRA_KEYSPACE = 'air_monitoring'
 CASSANDRA_TABLE = 'sensor_data'
 
 class AirQualityPredictor:
@@ -84,8 +84,7 @@ class AirQualityPredictor:
     def fetch_data(self, session, start_date=None, end_date=None):
         """Fetch air quality data from Cassandra"""
         try:
-            # Adjust query based on your table structure
-            query = f"SELECT sensor_id, timestamp, temperature, humidity, pm25, pm10, co2, tvoc FROM {CASSANDRA_TABLE}"
+            query = f"SELECT sensor_id, timestamp, temperature, humidity, pm25, pm10, co2 FROM {CASSANDRA_TABLE}"
             
             # Add date range if specified
             if start_date and end_date:
@@ -103,8 +102,7 @@ class AirQualityPredictor:
                     'humidity': row.humidity,
                     'pm25': row.pm25,
                     'pm10': row.pm10,
-                    'co2': row.co2,
-                    'tvoc': row.tvoc
+                    'co2': row.co2
                 })
             
             df = pd.DataFrame(data)
@@ -129,14 +127,12 @@ class AirQualityPredictor:
         temperature = np.random.normal(25, 5, n_samples)  # mean 25°C, std 5°C
         humidity = np.random.normal(60, 15, n_samples)    # mean 60%, std 15%
         co2 = np.random.normal(450, 100, n_samples)       # mean 450ppm, std 100ppm
-        tvoc = np.random.normal(200, 50, n_samples)       # mean 200ppb, std 50ppb
         
         # Create target variable (PM2.5) with some relationship to the features
         pm25 = (
             0.5 * temperature + 
             -0.3 * humidity + 
             0.2 * co2/100 + 
-            0.1 * tvoc/10 + 
             np.random.normal(0, 5, n_samples)  # Add some noise
         )
         # Ensure PM2.5 is positive
@@ -153,7 +149,6 @@ class AirQualityPredictor:
             'temperature': temperature,
             'humidity': humidity,
             'co2': co2,
-            'tvoc': tvoc,
             'pm25': pm25,
             'pm10': pm10
         })
@@ -176,7 +171,7 @@ class AirQualityPredictor:
             
             # Create feature matrix X and target variable y
             # Assuming we want to predict pm25 levels based on other factors
-            X = df[['temperature', 'humidity', 'co2', 'tvoc', 'hour', 'day', 'month', 'day_of_week']]
+            X = df[['temperature', 'humidity', 'co2', 'hour', 'day', 'month', 'day_of_week']]
             y = df['pm25']  # Target variable
             
             # Convert sensor_id to numeric if needed
@@ -341,8 +336,7 @@ class AirQualityPredictor:
                 data['day_of_week'] = now.weekday()
             
             # Select only the features the model was trained on
-            features = ['temperature', 'humidity', 'co2', 'tvoc', 
-                       'hour', 'day', 'month', 'day_of_week']
+            features = ['temperature', 'humidity', 'co2', 'hour', 'day', 'month', 'day_of_week']
             
             # Make sure all required features exist
             for feature in features:
@@ -481,7 +475,6 @@ if __name__ == "__main__":
             'temperature': 25.0,
             'humidity': 60.0,
             'co2': 450.0,
-            'tvoc': 200.0,
             'timestamp': datetime.now()
         }
         

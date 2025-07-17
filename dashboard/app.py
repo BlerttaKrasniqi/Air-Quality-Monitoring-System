@@ -4,13 +4,12 @@ import pandas
 import random
 import sys
 import os
-from faker_sensor import faker_sensor
 from prediction_service import AirQualityPredictor
 from flask import jsonify
 import pandas as pd
 from sensor_simulator.sensor_simulator import SmartAirQualitySensor
 from datetime import datetime,timezone, timedelta
-
+import prediction_service
 app = Flask(__name__)
 
 
@@ -53,6 +52,7 @@ def realtime_data():
                             .astimezone(timezone(timedelta(hours=2)))
                             .strftime("%Y-%m-%d %H:%M:%S")),
             "sensor_id": data.sensor_id
+
         })
     else:
         return jsonify({"error": "No data available"}), 404
@@ -66,15 +66,12 @@ def simulate_event():
 def get_sensor_data():
     return jsonify(sensor.generate_smart_data())
 
-predictor = AirQualityPredictor(
-    model_path="models/air_quality_model.joblib", 
-    scaler_path="models/air_quality_scaler.joblib"
-)
-
 @app.route('/api/predict', methods=['POST'])
 def predict():
     """API endpoint to get predictions based on current sensor data"""
     try:
+        metrics = AirQualityPredictor().train(data_source='cassandra',days=30)
+        predictor = AirQualityPredictor()
         data = request.json
         if not data:
             return jsonify({"error": "No data provided"}), 400
@@ -95,6 +92,8 @@ def predict():
 def predict_future():
     """API endpoint to predict future air quality based on current data"""
     try:
+        metrics = AirQualityPredictor().train(self,data_source='cassandra',days=30)
+        predictor = AirQualityPredictor()
         data = request.json
         if not data:
             return jsonify({"error": "No data provided"}), 400
