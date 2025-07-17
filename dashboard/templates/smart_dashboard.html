@@ -335,6 +335,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Global variables
@@ -668,6 +669,153 @@
                 alert('Error calibrating sensor');
             }
         }
+
+        // Function to fetch and display predictions
+    async function getPredictions() {
+        try {
+            // Get the latest sensor data
+            // You may need to adjust these selectors based on your actual HTML structure
+            const latestData = {
+                temperature: parseFloat(document.querySelector('.temperature .value').textContent || '0'),
+                humidity: parseFloat(document.querySelector('.humidity .value').textContent || '0'),
+                co2: parseFloat(document.querySelector('.co2 .value').textContent || '0'),
+                tvoc: parseFloat(document.querySelector('.tvoc .value').textContent || '0'),
+                timestamp: new Date().toISOString()
+            };
+
+            // Call the prediction API
+            const predictionResponse = await axios.post('/api/predict', latestData);
+            
+            if (predictionResponse.data.error) {
+                console.error('Prediction error:', predictionResponse.data.error);
+                return;
+            }
+            
+            // Display the prediction in the UI
+            const predictedValue = predictionResponse.data.predicted_pm25.toFixed(2);
+            document.getElementById('predicted-pm25').textContent = predictedValue;
+            
+            // Get future predictions for chart
+            const futureResponse = await axios.post('/api/predict_future', latestData);
+            
+            if (Array.isArray(futureResponse.data)) {
+                updatePredictionChart(futureResponse.data);
+            }
+        } catch (error) {
+            console.error('Error fetching predictions:', error);
+        }
+    }
+
+    // Function to update the prediction chart
+    function updatePredictionChart(predictions) {
+        const labels = predictions.map(p => {
+            const date = new Date(p.timestamp);
+            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        });
+        
+        const values = predictions.map(p => p.predicted_pm25);
+        
+        // Create or update the chart
+        if (!window.predictionChart) {
+            const ctx = document.getElementById('prediction-chart').getContext('2d');
+            window.predictionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Predicted PM2.5',
+                        data: values,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'PM2.5 (μg/m³)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            window.predictionChart.data.labels = labels;
+            window.predictionChart.data.datasets[0].data = values;
+            window.predictionChart.update();
+        }
+    }
+
+    // Add prediction section to dashboard
+    function addPredictionSection() {
+        // Check if prediction section already exists
+        if (document.getElementById('prediction-section')) {
+            return;
+        }
+        
+        // Create prediction section
+        const predictionSection = document.createElement('div');
+        predictionSection.id = 'prediction-section';
+        predictionSection.className = 'dashboard-card';
+        
+        // Add content to prediction section
+        predictionSection.innerHTML = `
+            <div class="card-header">
+                <h2>AI Predictions</h2>
+            </div>
+            <div class="card-body">
+                <div class="sensor-reading">
+                    <div class="label">Predicted PM2.5:</div>
+                    <div class="value" id="predicted-pm25">--</div>
+                    <div class="unit">μg/m³</div>
+                </div>
+                <div class="chart-container">
+                    <h3>24-Hour Forecast</h3>
+                    <canvas id="prediction-chart"></canvas>
+                </div>
+            </div>
+        `;
+        
+        // Find a good place to insert the prediction section
+        // This may need adjustment based on your actual dashboard structure
+        const dashboardContainer = document.querySelector('.dashboard-grid') || document.querySelector('.main-container');
+        
+        if (dashboardContainer) {
+            dashboardContainer.appendChild(predictionSection);
+        } else {
+            // If no suitable container found, add to body
+            document.body.appendChild(predictionSection);
+        }
+    }
+
+    // Initialize prediction functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add prediction section to dashboard
+        addPredictionSection();
+        
+        // Get initial predictions
+        getPredictions();
+        
+        // Update predictions every 5 minutes
+        setInterval(getPredictions, 5 * 60 * 1000);
+    });
+
+    // Also update predictions when dashboard is updated
+    const originalUpdateDashboard = window.updateDashboard;
+    window.updateDashboard = async function() {
+        await originalUpdateDashboard();
+        getPredictions();
+    };
     </script>
 </body>
 </html> 

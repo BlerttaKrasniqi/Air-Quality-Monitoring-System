@@ -32,7 +32,7 @@ class SmartDashboard:
     def connect_to_cassandra(self):
         """Connect to Cassandra database."""
         try:
-            self.cluster = Cluster(['127.0.0.1'])
+            self.cluster = Cluster(['cassandra'])
             self.session = self.cluster.connect('air_monitoring')
             logger.info("✅ Connected to Cassandra database")
         except Exception as e:
