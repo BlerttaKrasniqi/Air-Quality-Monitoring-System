@@ -1,3 +1,5 @@
 flask
 cassandra-driver
 pandas
+faker
+kafka-python

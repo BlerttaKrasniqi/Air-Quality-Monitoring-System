@@ -5,7 +5,7 @@ from pyspark.sql.types import StructType, FloatType, StringType, TimestampType
 # Initialize Spark session with Cassandra connector
 spark = SparkSession.builder \
     .appName("AirQualityStreamProcessor") \
-    .config("spark.cassandra.connection.host", "localhost") \
+    .config("spark.cassandra.connection.host", "cassandra") \
     .config("spark.cassandra.connection.port", "9042") \
     .getOrCreate()
 
@@ -23,7 +23,7 @@ schema = StructType() \
 # Read from Kafka
 df = spark.readStream \
     .format("kafka") \
-    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("kafka.bootstrap.servers", "kafka:9092") \
     .option("subscribe", "air_quality") \
     .load()
 

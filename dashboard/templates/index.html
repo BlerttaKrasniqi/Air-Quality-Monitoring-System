@@ -13,7 +13,7 @@
     <canvas id="tempChart" width="400" height="200"></canvas>
 
     <script>
-    const data = /* {{ data | tojson | safe }} */ [];
+    // const data =  {{ data | tojson | safe }}  [];
     const timestamps = data.map(entry => entry.timestamp);
     const pm25 = data.map(entry => entry.pm25);
     const temperature = data.map(entry => entry.temperature);
