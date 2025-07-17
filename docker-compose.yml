@@ -6,10 +6,10 @@ services:
     ports:
       - "2181:2181"
     healthcheck:
-      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "cqlsh -u cassandra -p cassandra -e 'SELECT now() FROM system.local;' || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -69,7 +69,7 @@ services:
     image: bitnami/spark:3.5.1
     depends_on:
       cassandra:
-        condition: service_healthy
+        condition: service_started
       kafka:
         condition: service_started
       spark-master:
@@ -88,6 +88,10 @@ services:
   frontend:
     build: ./dashboard
     ports:
-      - "8501:8501"
+      # - "8501:8501"
+      - "5000:5000"
+    volumes:
+    - ./dashboard:/app
+    - ./sensor_simulator:/app/sensor_simulator
     depends_on:
       - cassandra

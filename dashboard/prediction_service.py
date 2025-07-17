@@ -18,10 +18,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Cassandra connection parameters
-CASSANDRA_HOST = ['localhost']  # Update with your Cassandra host
+CASSANDRA_HOST = ['cassandra']
 CASSANDRA_PORT = 9042
-CASSANDRA_USERNAME = ''  # Fill if authentication is required
-CASSANDRA_PASSWORD = ''  # Fill if authentication is required
+CASSANDRA_USERNAME = '' 
+CASSANDRA_PASSWORD = ''  
 CASSANDRA_KEYSPACE = 'air_quality_monitoring'
 CASSANDRA_TABLE = 'sensor_data'
 
@@ -38,7 +38,6 @@ class AirQualityPredictor:
         self.metrics = None
         self.training_timestamp = None
         
-        # Try to load existing model if available
         self.load_model()
     
     def load_model(self):
