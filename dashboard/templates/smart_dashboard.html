@@ -671,10 +671,9 @@
         }
 
         // Function to fetch and display predictions
-    async function getPredictions() {
+      async function getPredictions() {
         try {
             // Get the latest sensor data
-            // You may need to adjust these selectors based on your actual HTML structure
             const latestData = {
                 temperature: parseFloat(document.querySelector('.temperature .value').textContent || '0'),
                 humidity: parseFloat(document.querySelector('.humidity .value').textContent || '0'),
@@ -786,8 +785,6 @@
             </div>
         `;
         
-        // Find a good place to insert the prediction section
-        // This may need adjustment based on your actual dashboard structure
         const dashboardContainer = document.querySelector('.dashboard-grid') || document.querySelector('.main-container');
         
         if (dashboardContainer) {
