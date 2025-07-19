@@ -93,7 +93,7 @@ class AirQualityPredictor:
     def fetch_data(self, session, start_date=None, end_date=None):
         """Fetch air quality data from Cassandra"""
         try:
-            query = f"SELECT id, timestamp, temperature, humidity, pm25, pm10, co2 FROM {CASSANDRA_TABLE}"
+            query = f"SELECT sensor_id, timestamp, temperature, humidity, pm25, pm10, co2 FROM {CASSANDRA_TABLE}"
             
             # Add date range if specified
             if start_date and end_date:
@@ -106,7 +106,7 @@ class AirQualityPredictor:
                 data = []
                 for row in rows:
                     data.append({
-                        'sensor_id': row.id,
+                        'sensor_id': row.sensor_id,
                         'timestamp': row.timestamp,
                         'temperature': row.temperature,
                         'humidity': row.humidity,

@@ -37,7 +37,6 @@ def get_predictor():
             if not os.path.exists(predictor.model_path) or not predictor.model:
                 logger.info("No model found. Training a new model at startup...")
                 
-                # Use timer for training duration
                 with TimerContextManager(
                     model_training_duration, 
                     {'model_type': 'random_forest', 'data_source': 'cassandra'}
@@ -61,6 +60,8 @@ with app.app_context():
     get_predictor()
     # Start metrics collection
     start_metrics_collection()
+
+# Smart sensor configuration
 
 kosovo_config = {
     'city': 'Pristina',
@@ -109,7 +110,7 @@ def realtime_data():
                 "temperature": data.temperature,
                 "humidity": data.humidity,
                 "timestamp": data.timestamp.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=2))).strftime("%Y-%m-%d %H:%M:%S"),
-                "id": data.id
+                "id": data.sensor_id
             })
         else:
             # Record failure
@@ -124,6 +125,29 @@ def realtime_data():
     finally:
         if 'cluster' in locals():
             cluster.shutdown()
+
+    query = "SELECT * FROM sensor_data LIMIT 100 ALLOW FILTERING"
+    rows = session.execute(query)
+
+   
+    data_list = list(rows)
+    if not data_list:
+        return jsonify({"error": "No data available"}), 404
+
+    latest_data = max(data_list, key=lambda x: x.timestamp)
+
+    return jsonify({
+        "pm25": latest_data.pm25,
+        "pm10": latest_data.pm10,
+        "co2": latest_data.co2,
+        "temperature": latest_data.temperature,
+        "humidity": latest_data.humidity,
+        "timestamp": latest_data.timestamp.replace(tzinfo=timezone.utc)
+            .astimezone(timezone(timedelta(hours=2)))
+            .strftime("%Y-%m-%d %H:%M:%S"),
+        "sensor_id": latest_data.id
+    })
+
 
 @app.route("/api/simulate-event", methods=["POST"])
 def simulate_event():
