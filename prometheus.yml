@@ -1,15 +1,9 @@
 global:
-  scrape_interval: 15s  # Interval për mbledhjen e metrikave
+  scrape_interval: 15s
+  evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'cassandra'
+  - job_name: 'air_quality_app'
     static_configs:
-      - targets: ['cassandra-exporter:9180']  # Cassandra Exporter porti
-
-  - job_name: 'kafka'
-    static_configs:
-      - targets: ['kafka-exporter:9308']  # Kafka Exporter porti
-
-  - job_name: 'spark'
-    static_configs:
-      - targets: ['spark-exporter:4040']  # Spark Exporter porti
+      - targets: ['frontend:5001']  # Adjust if your app is on a different host/port
+    metrics_path: '/metrics'

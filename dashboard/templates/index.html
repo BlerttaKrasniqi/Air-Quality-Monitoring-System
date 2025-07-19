@@ -53,6 +53,11 @@
             max-width: 900px;
             margin: 40px auto;
         }
+        .predicted-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -70,6 +75,32 @@
 
     <div id="chart-container">
         <canvas id="realtimeChart"></canvas>
+    </div>
+
+    <!-- AI Prediction Section -->
+    <div class="container">
+        <h3 class="mb-3 text-center">AI Predictions</h3>
+        <div class="row" id="predictionSection">
+            <!-- Current Prediction -->
+            <div class="col-md-4">
+                <div class="card sensor-card p-3 mb-3">
+                    <h5 class="text-center">Predicted PM2.5</h5>
+                    <div class="text-center predicted-value" id="predicted-pm25">--</div>
+                    <div class="text-center">µg/m³</div>
+                </div>
+            </div>
+            
+            <!-- Prediction Chart -->
+            <div class="col-md-8">
+                <div class="card sensor-card p-3 mb-3">
+                    <h5 class="text-center">24-Hour Forecast</h5>
+                    <div class="chart-container">
+                        <canvas id="prediction-chart"></canvas>
+                    </div>
+                    <div id="chart-debug" class="text-center text-muted mt-2" style="font-size: 12px;"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -124,6 +155,7 @@
             }
 
             chart.update();
+            getPredictions(data);
 
             showAlert(data.pm25, data.co2);
         }
@@ -153,9 +185,284 @@
                 console.error("Error fetching data:", err);
             }
         }
+        
+        async function getPredictions(sensorData) {
+            try {
+                const debugElement = document.getElementById('chart-debug');
+                if (debugElement) {
+                    debugElement.textContent = 'Fetching predictions...';
+                }
+                
+                // Use the provided sensor data or create default data
+                const latestData = sensorData || {
+                    temperature: parseFloat(document.getElementById("temperature").innerText || '25'),
+                    humidity: parseFloat(document.getElementById("humidity").innerText || '60'),
+                    co2: parseFloat(document.getElementById("co2").innerText || '450'),
+                    timestamp: document.getElementById("timestamp").innerText || new Date().toISOString()
+                };
+
+                // Call the prediction API
+                const predictionResponse = await axios.post('/api/predict', latestData);
+                
+                if (predictionResponse.data.error) {
+                    console.error('Prediction error:', predictionResponse.data.error);
+                    if (debugElement) {
+                        debugElement.textContent = `Error: ${predictionResponse.data.error}`;
+                    }
+                    return;
+                }
+                
+                // Display the prediction in the UI
+                const predictedValue = predictionResponse.data.predicted_pm25.toFixed(2);
+                document.getElementById('predicted-pm25').textContent = predictedValue;
+                
+                // Get future predictions for chart
+                const futureResponse = await axios.post('/api/predict_future', latestData);
+                
+                if (debugElement) {
+                    debugElement.textContent = 'Processing prediction data...';
+                }
+                
+                if (Array.isArray(futureResponse.data)) {
+                    updatePredictionChart(futureResponse.data);
+                } else {
+                    console.error('Invalid prediction data format:', futureResponse.data);
+                    if (debugElement) {
+                        debugElement.textContent = 'Error: Invalid prediction data format';
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching predictions:', error);
+                const debugElement = document.getElementById('chart-debug');
+                if (debugElement) {
+                    debugElement.textContent = `Error: ${error.message || 'Could not fetch predictions'}`;
+                }
+            }
+        }
+
+        function updatePredictionChart(predictions) {
+            const debugElement = document.getElementById('chart-debug');
+            
+            const labels = predictions.map(p => {
+                const date = new Date(p.timestamp);
+                return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            });
+            
+            const values = predictions.map(p => p.predicted_pm25);
+            
+            // Create or update the chart
+            if (!window.predictionChart) {
+                const ctx = document.getElementById('prediction-chart').getContext('2d');
+                window.predictionChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Predicted PM2.5',
+                            data: values,
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'PM2.5 (μg/m³)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Time'
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                if (debugElement) {
+                    debugElement.textContent = 'Chart initialized successfully';
+                }
+            } else {
+                window.predictionChart.data.labels = labels;
+                window.predictionChart.data.datasets[0].data = values;
+                window.predictionChart.update();
+                
+                if (debugElement) {
+                    debugElement.textContent = `Chart updated: ${new Date().toLocaleTimeString()}`;
+                }
+            }
+        }
+        
+        async function trainAIModel() {
+            try {
+                // Show training status
+                const statusElement = document.getElementById('training-status');
+                if (statusElement) {
+                    statusElement.textContent = 'Training in progress... This may take several minutes.';
+                    statusElement.className = 'status-message bg-info text-white';
+                }
+                
+                const response = await axios.post('/api/train-model', {
+                    data_source: 'cassandra',
+                    days: 2 // Number of days of data to use for training
+                });
+                
+                if (response.data.status === 'success') {
+                    if (statusElement) {
+                        statusElement.textContent = `Training started successfully. This may take several minutes.`;
+                        statusElement.className = 'status-message bg-success text-white';
+                    } else {
+                        alert('Model training started successfully!');
+                    }
+                    
+                    // Check training status periodically
+                    checkTrainingStatus();
+                } else {
+                    if (statusElement) {
+                        statusElement.textContent = `Error starting training: ${response.data.error}`;
+                        statusElement.className = 'status-message bg-danger text-white';
+                    } else {
+                        alert(`Error starting training: ${response.data.error}`);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error training model:', error);
+                const statusElement = document.getElementById('training-status');
+                if (statusElement) {
+                    statusElement.textContent = `Error: ${error.message || 'Could not train model'}`;
+                    statusElement.className = 'status-message bg-danger text-white';
+                } else {
+                    alert(`Error training model: ${error.message || 'Unknown error'}`);
+                }
+            }
+        }
+
+        async function checkTrainingStatus() {
+            // Check training status every 30 seconds
+            const checkInterval = setInterval(async () => {
+                try {
+                    const response = await axios.get('/api/model-info');
+                    
+                    if (response.data.status === 'success') {
+                        document.getElementById('model-timestamp').textContent = response.data.timestamp || 'Not trained';
+                        document.getElementById('model-accuracy').textContent = response.data.accuracy ? `${response.data.accuracy}` : 'N/A';
+                        
+                        const statusElement = document.getElementById('training-status');
+                        
+                        // If timestamp has changed, training is complete
+                        if (response.data.timestamp && response.data.timestamp !== lastTimestamp) {
+                            if (statusElement) {
+                                statusElement.textContent = `Model trained successfully! Accuracy: ${response.data.accuracy || 'N/A'}`;
+                                statusElement.className = 'status-message bg-success text-white';
+                            }
+                            
+                            // Stop checking
+                            clearInterval(checkInterval);
+                        }
+                        
+                        // Store timestamp for comparison
+                        lastTimestamp = response.data.timestamp;
+                    }
+                } catch (error) {
+                    console.error('Error checking model status:', error);
+                }
+            }, 30000); // Every 30 seconds
+            
+            // Stop checking after 30 minutes (training should be done by then)
+            setTimeout(() => {
+                clearInterval(checkInterval);
+            }, 30 * 60 * 1000);
+        }
+
+        async function fetchModelInfo() {
+            try {
+                const response = await axios.get('/api/model-info');
+                
+                if (response.data.status === 'success') {
+                    document.getElementById('model-timestamp').textContent = response.data.timestamp || 'Not trained';
+                    document.getElementById('model-accuracy').textContent = response.data.accuracy ? `${response.data.accuracy}` : 'N/A';
+                    
+                    // Store timestamp for comparison
+                    lastTimestamp = response.data.timestamp;
+                }
+            } catch (error) {
+                console.error('Error fetching model info:', error);
+            }
+        }
+        
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize chart with empty data
+            const ctx = document.getElementById('prediction-chart').getContext('2d');
+            window.predictionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array(24).fill(0).map((_, i) => `+${i}h`),
+                    datasets: [{
+                        label: 'Predicted PM2.5',
+                        data: Array(24).fill(null),
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'PM2.5 (μg/m³)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Fetch model info
+            fetchModelInfo();
+            
+            // Update data every 5 seconds
+            setInterval(loadSensorData, 5000);
+        });
 
         setInterval(fetchData, 5000);
         fetchData(); // initial call
+
     </script>
 </body>
 </html>

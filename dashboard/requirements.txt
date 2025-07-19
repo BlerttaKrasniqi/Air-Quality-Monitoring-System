@@ -9,3 +9,5 @@ faker
 kafka-python
 joblib
 scikit-learn
+prometheus-client==0.16.0
+psutil==5.9.5
