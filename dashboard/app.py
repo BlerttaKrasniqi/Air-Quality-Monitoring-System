@@ -28,25 +28,30 @@ def index():
 def realtime_data():
     cluster = Cluster(['cassandra'])
     session = cluster.connect('air_monitoring')
-    query = "SELECT * FROM sensor_data LIMIT 1"
-    rows = session.execute(query)
-    data = rows.one()
 
-    if data:
-        return jsonify({
-            "pm25": data.pm25,
-            "pm10": data.pm10,
-            "co2": data.co2,
-            "temperature": data.temperature,
-            "humidity": data.humidity,
-            "timestamp": (
-                data.timestamp.replace(tzinfo=timezone.utc)
-                              .astimezone(timezone(timedelta(hours=2)))
-                              .strftime("%Y-%m-%d %H:%M:%S")),
-            "sensor_id": data.sensor_id
-        })
-    else:
+    query = "SELECT * FROM sensor_data LIMIT 100 ALLOW FILTERING"
+    rows = session.execute(query)
+
+   
+    data_list = list(rows)
+    if not data_list:
         return jsonify({"error": "No data available"}), 404
+
+    latest_data = max(data_list, key=lambda x: x.timestamp)
+
+    return jsonify({
+        "pm25": latest_data.pm25,
+        "pm10": latest_data.pm10,
+        "co2": latest_data.co2,
+        "temperature": latest_data.temperature,
+        "humidity": latest_data.humidity,
+        "timestamp": latest_data.timestamp.replace(tzinfo=timezone.utc)
+            .astimezone(timezone(timedelta(hours=2)))
+            .strftime("%Y-%m-%d %H:%M:%S"),
+        "sensor_id": latest_data.sensor_id
+    })
+
+
 
 @app.route("/api/simulate-event", methods=["POST"])
 def simulate_event():
