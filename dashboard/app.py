@@ -1,3 +1,4 @@
+import prediction_service
 from flask import Flask, render_template, jsonify, request
 from cassandra.cluster import Cluster
 import pandas
@@ -9,7 +10,7 @@ from flask import jsonify
 import pandas as pd
 from sensor_simulator.sensor_simulator import SmartAirQualitySensor
 from datetime import datetime,timezone, timedelta
-import prediction_service
+
 app = Flask(__name__)
 
 
@@ -92,15 +93,14 @@ def predict():
 def predict_future():
     """API endpoint to predict future air quality based on current data"""
     try:
-        metrics = AirQualityPredictor().train(self,data_source='cassandra',days=30)
+        metrics = AirQualityPredictor().train(data_source='cassandra',days=30)
         predictor = AirQualityPredictor()
         data = request.json
         if not data:
             return jsonify({"error": "No data provided"}), 400
         
         hours_ahead = int(request.args.get('hours', 24))
-        
-        # Make future predictions
+   
         predictions = predictor.predict_future(data, hours_ahead=hours_ahead)
         
         # Format for response

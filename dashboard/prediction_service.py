@@ -456,7 +456,7 @@ if __name__ == "__main__":
     args = parse_args()
     
     # Create the AI system
-    air_quality_ai = AirQualityAI(
+    air_quality_ai = AirQualityPredictor(
         model_path=args.model_path,
         scaler_path=args.scaler_path
     )
