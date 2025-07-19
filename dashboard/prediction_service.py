@@ -12,6 +12,11 @@ import os
 import json
 import argparse
 from datetime import datetime, timedelta
+from prometheus_metrics import (
+    db_query_counter, db_query_duration, db_row_count,
+    model_training_duration, model_accuracy, model_prediction_duration,
+    TimerContextManager
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -68,47 +73,58 @@ class AirQualityPredictor:
     def connect_to_cassandra(self):
         """Establish connection to Cassandra database"""
         try:
-            if CASSANDRA_USERNAME and CASSANDRA_PASSWORD:
-                auth_provider = PlainTextAuthProvider(username=CASSANDRA_USERNAME, password=CASSANDRA_PASSWORD)
-                cluster = Cluster(CASSANDRA_HOST, port=CASSANDRA_PORT, auth_provider=auth_provider)
-            else:
-                cluster = Cluster(CASSANDRA_HOST, port=CASSANDRA_PORT)
+            with TimerContextManager(db_query_duration, {'query_type': 'connect'}):
+                if CASSANDRA_USERNAME and CASSANDRA_PASSWORD:
+                    auth_provider = PlainTextAuthProvider(username=CASSANDRA_USERNAME, password=CASSANDRA_PASSWORD)
+                    cluster = Cluster(CASSANDRA_HOST, port=CASSANDRA_PORT, auth_provider=auth_provider)
+                else:
+                    cluster = Cluster(CASSANDRA_HOST, port=CASSANDRA_PORT)
+                
+                session = cluster.connect(CASSANDRA_KEYSPACE)
             
-            session = cluster.connect(CASSANDRA_KEYSPACE)
+            db_query_counter.labels(query_type='connect', status='success').inc()
             logger.info("Connected to Cassandra database")
             return session
         except Exception as e:
+            db_query_counter.labels(query_type='connect', status='error').inc()
             logger.error(f"Failed to connect to Cassandra: {e}")
             raise
     
     def fetch_data(self, session, start_date=None, end_date=None):
         """Fetch air quality data from Cassandra"""
         try:
-            query = f"SELECT sensor_id, timestamp, temperature, humidity, pm25, pm10, co2 FROM {CASSANDRA_TABLE}"
+            query = f"SELECT id, timestamp, temperature, humidity, pm25, pm10, co2 FROM {CASSANDRA_TABLE}"
             
             # Add date range if specified
             if start_date and end_date:
                 query += f" WHERE timestamp >= '{start_date}' AND timestamp <= '{end_date}'"
             
-            rows = session.execute(query)
+            with TimerContextManager(db_query_duration, {'query_type': 'fetch_sensor_data'}):
+                rows = session.execute(query)
+                
+                # Convert to pandas DataFrame
+                data = []
+                for row in rows:
+                    data.append({
+                        'sensor_id': row.id,
+                        'timestamp': row.timestamp,
+                        'temperature': row.temperature,
+                        'humidity': row.humidity,
+                        'pm25': row.pm25,
+                        'pm10': row.pm10,
+                        'co2': row.co2
+                    })
+                
+                df = pd.DataFrame(data)
             
-            # Convert to pandas DataFrame
-            data = []
-            for row in rows:
-                data.append({
-                    'sensor_id': row.sensor_id,
-                    'timestamp': row.timestamp,
-                    'temperature': row.temperature,
-                    'humidity': row.humidity,
-                    'pm25': row.pm25,
-                    'pm10': row.pm10,
-                    'co2': row.co2
-                })
+            # Record metrics
+            db_query_counter.labels(query_type='fetch_sensor_data', status='success').inc()
+            db_row_count.labels(query_type='fetch_sensor_data').observe(len(df))
             
-            df = pd.DataFrame(data)
             logger.info(f"Retrieved {len(df)} records from Cassandra")
             return df
         except Exception as e:
+            db_query_counter.labels(query_type='fetch_sensor_data', status='error').inc()
             logger.error(f"Error fetching data: {e}")
             raise
     
@@ -118,10 +134,9 @@ class AirQualityPredictor:
         
         np.random.seed(42)
         
-        # Generate timestamps for the last 30 days, every hour
         end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
-        timestamps = [start_date + timedelta(hours=i) for i in range(30*24)][:n_samples]
+        timestamps = [start_date + timedelta(hours=i) for i in range(n_samples)]
         
         # Generate synthetic features
         temperature = np.random.normal(25, 5, n_samples)  # mean 25°C, std 5°C
@@ -198,13 +213,15 @@ class AirQualityPredictor:
             # Create and train the model
             model = RandomForestRegressor(
                 n_estimators=100,
-                max_depth=10,
+                max_depth=20,
                 random_state=42,
                 n_jobs=-1
             )
             
             logger.info("Training model...")
-            model.fit(X_train, y_train)
+            with TimerContextManager(model_training_duration, {'model_type': 'random_forest', 'data_source': 'processed'}):
+                model.fit(X_train, y_train)
+            
             logger.info("Model training completed")
             return model
         except Exception as e:
@@ -221,6 +238,11 @@ class AirQualityPredictor:
             mse = mean_squared_error(y_test, y_pred)
             rmse = np.sqrt(mse)
             r2 = r2_score(y_test, y_pred)
+            
+            # Record metrics in Prometheus
+            model_accuracy.labels(model_type='random_forest', metric_name='mse').set(mse)
+            model_accuracy.labels(model_type='random_forest', metric_name='rmse').set(rmse)
+            model_accuracy.labels(model_type='random_forest', metric_name='r2_score').set(r2)
             
             logger.info(f"Model Evaluation Metrics:")
             logger.info(f"Mean Squared Error: {mse:.4f}")
@@ -260,7 +282,7 @@ class AirQualityPredictor:
             logger.error(f"Error saving model: {e}")
             raise
     
-    def train(self, data_source='cassandra', days=30):
+    def train(self, data_source='cassandra', days=2):
         """Main function to orchestrate the training process"""
         try:
             # Get data based on source
@@ -365,8 +387,9 @@ class AirQualityPredictor:
             # Preprocess the input data
             X_scaled = self.preprocess_input(data)
             
-            # Make prediction
-            predictions = self.model.predict(X_scaled)
+            # Make prediction with timing
+            with TimerContextManager(model_prediction_duration, {'model_type': 'random_forest'}):
+                predictions = self.model.predict(X_scaled)
             
             return predictions[0] if len(predictions) == 1 else predictions
         
@@ -456,7 +479,7 @@ if __name__ == "__main__":
     args = parse_args()
     
     # Create the AI system
-    air_quality_ai = AirQualityAI(
+    air_quality_ai = AirQualityPredictor(
         model_path=args.model_path,
         scaler_path=args.scaler_path
     )

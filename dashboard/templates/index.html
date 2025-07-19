@@ -113,7 +113,6 @@
                     temperature: parseFloat(document.getElementById("temperature").innerText || '25'),
                     humidity: parseFloat(document.getElementById("humidity").innerText || '60'),
                     co2: parseFloat(document.getElementById("co2").innerText || '450'),
-                    tvoc: 200, // Default TVOC if not present in your data
                     timestamp: document.getElementById("timestamp").innerText || new Date().toISOString()
                 };
 
@@ -236,7 +235,7 @@
                 
                 const response = await axios.post('/api/train-model', {
                     data_source: 'cassandra',
-                    days: 30 // Number of days of data to use for training
+                    days: 2 // Number of days of data to use for training
                 });
                 
                 if (response.data.status === 'success') {
