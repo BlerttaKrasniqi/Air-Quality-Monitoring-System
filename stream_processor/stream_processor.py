@@ -34,7 +34,7 @@ json_df = df.selectExpr("CAST(value AS STRING)") \
 
 # Cast timestamp and add UUID id column
 processed_df = json_df.withColumn("timestamp", col("timestamp").cast(TimestampType()))
-final_df = processed_df.withColumn("id", expr("uuid()"))
+final_df = processed_df.withColumn("sensor_id", expr("uuid()"))
 
 # Write to Cassandra
 query = final_df.writeStream \
