@@ -106,16 +106,6 @@ services:
       - ./sensor_simulator:/app/sensor_simulator
     depends_on:
       - cassandra
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-<<<<<<< HEAD
-=======
->>>>>>> Stashed changes
-=======
-<<<<<<< HEAD
-=======
->>>>>>> Stashed changes
 
   prometheus:
     image: prom/prometheus:latest
@@ -152,14 +142,4 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
   cassandra_data:
-=======
-  cassandra_data:
->>>>>>> 215f074c659bdba23bcbfd57b0f6faf39b0527bd
->>>>>>> Stashed changes
-=======
-  cassandra_data:
->>>>>>> 215f074c659bdba23bcbfd57b0f6faf39b0527bd
->>>>>>> Stashed changes
