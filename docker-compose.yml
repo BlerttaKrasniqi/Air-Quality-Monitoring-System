@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
@@ -34,7 +36,6 @@ services:
     image: cassandra:latest
     ports:
       - "9042:9042"
-
     mem_limit: 1g
     environment:
       - MAX_HEAP_SIZE=512M
@@ -44,6 +45,17 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+
+  spark-job:
+    image: bitnami/spark:3.5.1
+    depends_on:
+      - kafka
+      - cassandra
+    volumes:
+      - ./stream_processor/stream_processor.py:/opt/bitnami/spark/app.py
+    command: >
+      /opt/bitnami/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,com.datastax.spark:spark-cassandra-connector_2.12:3.2.0 /opt/bitnami/spark/app.py
+
 
   spark-master:
     image: bitnami/spark:3.5.1
@@ -88,11 +100,10 @@ services:
   frontend:
     build: ./dashboard
     ports:
-      # - "8501:8501"
       - "5001:5000"
     volumes:
-    - ./dashboard:/app
-    - ./sensor_simulator:/app/sensor_simulator
+      - ./dashboard:/app
+      - ./sensor_simulator:/app/sensor_simulator
     depends_on:
       - cassandra
 

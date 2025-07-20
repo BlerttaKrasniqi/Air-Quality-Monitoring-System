@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, expr
+from pyspark.sql.functions import from_json, col, expr, window, avg
 from pyspark.sql.types import StructType, FloatType, StringType, TimestampType
 
 # Initialize Spark session with Cassandra connector
@@ -35,14 +35,44 @@ json_df = df.selectExpr("CAST(value AS STRING)") \
 # Cast timestamp and add UUID id column
 processed_df = json_df.withColumn("timestamp", col("timestamp").cast(TimestampType()))
 final_df = processed_df.withColumn("sensor_id", expr("uuid()"))
+# Filter invalid data
+valid_df = json_df.filter(
+    (col("pm25").isNotNull()) &
+    (col("temperature") > 0) &
+    (col("humidity") > 0)
+)
+# Convert timestamp string to timestamp type
+valid_df = valid_df.withColumn("timestamp", col("timestamp").cast(TimestampType()))
 
-# Write to Cassandra
-query = final_df.writeStream \
+# Add UUID for Cassandra
+final_df = valid_df.withColumn("id", expr("uuid()"))
+
+# Write valid records to Cassandra
+query_raw = final_df.writeStream \
     .format("org.apache.spark.sql.cassandra") \
-    .option("checkpointLocation", "./checkpoint") \
+    .option("checkpointLocation", "./checkpoint_raw") \
     .option("keyspace", "air_monitoring") \
     .option("table", "sensor_data") \
     .outputMode("append") \
     .start()
 
-query.awaitTermination()
+# Sliding window aggregation (e.g., every 30 sec, sliding every 10 sec)
+aggregated_df = valid_df \
+    .withWatermark("timestamp", "1 minute") \
+    .groupBy(window(col("timestamp"), "30 seconds", "10 seconds")) \
+    .agg(
+        avg("pm25").alias("avg_pm25"),
+        avg("pm10").alias("avg_pm10"),
+        avg("co2").alias("avg_co2"),
+        avg("temperature").alias("avg_temp"),
+        avg("humidity").alias("avg_humidity")
+    )
+
+# Write aggregation results to console (for monitoring/debugging)
+query_agg = aggregated_df.writeStream \
+    .outputMode("update") \
+    .format("console") \
+    .option("truncate", "false") \
+    .start()
+
+query_raw.awaitTermination()
