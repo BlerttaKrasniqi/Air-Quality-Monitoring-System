@@ -32,13 +32,15 @@ json_df = df.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), schema).alias("data")) \
     .select("data.*")
 
+# Cast timestamp and add UUID id column
+processed_df = json_df.withColumn("timestamp", col("timestamp").cast(TimestampType()))
+final_df = processed_df.withColumn("sensor_id", expr("uuid()"))
 # Filter invalid data
 valid_df = json_df.filter(
     (col("pm25").isNotNull()) &
     (col("temperature") > 0) &
     (col("humidity") > 0)
 )
-
 # Convert timestamp string to timestamp type
 valid_df = valid_df.withColumn("timestamp", col("timestamp").cast(TimestampType()))
 
@@ -74,4 +76,3 @@ query_agg = aggregated_df.writeStream \
     .start()
 
 query_raw.awaitTermination()
-query_agg.awaitTermination()

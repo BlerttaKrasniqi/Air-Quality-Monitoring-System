@@ -1,0 +1,1 @@
+["temperature", "humidity", "pm25", "pm10", "co2", "hour", "day", "month", "day_of_week", "is_weekend", "is_night", "hour_sin", "hour_cos", "month_sin", "month_cos", "heat_index", "dew_point", "temp_humidity_ratio", "co2_norm", "co2_temp_interaction"]
