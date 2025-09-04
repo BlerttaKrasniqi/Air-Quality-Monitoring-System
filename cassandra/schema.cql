@@ -1,15 +1,13 @@
 CREATE KEYSPACE IF NOT EXISTS air_monitoring
-WITH REPLICATION = {
-    'class': 'SimpleStrategy',
-    'replication_factor': 1
-};
+WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1};
 
-CREATE TABLE IF NOT EXISTS airmonitoring.sensor_data (
-    id UUID PRIMARY KEY,
-    pm25 float,
-    pm10 float,
-    co2 float,
-    temperature float,
-    humidity float,
-    timestamp timestamp
+-- FIX: table must be in the *same* keyspace name "air_monitoring"
+CREATE TABLE IF NOT EXISTS air_monitoring.sensor_data (
+  id uuid PRIMARY KEY,
+  pm25 float,
+  pm10 float,
+  co2 float,
+  temperature float,
+  humidity float,
+  timestamp timestamp
 );

@@ -1,15 +1,29 @@
-flask
-cassandra-driver
-pandas
-pydeck
-jsonschema-specifications
-gitpython
-altair
-faker
-kafka-python
-joblib
-scikit-learn
-prometheus-client==0.16.0
-psutil==5.9.5
-seaborn
-matplotlib
+# flask
+# cassandra-driver
+# pandas
+# pydeck
+# jsonschema-specifications
+# gitpython
+# altair
+# faker
+# kafka-python
+# joblib
+# scikit-learn
+# prometheus-client==0.16.0
+# psutil==5.9.5
+# seaborn
+# matplotlib
+# Flask==3.0.3
+# flask-cors==4.0.0
+# cassandra-driver==3.29.2
+# prometheus-client==0.20.0
+# kafka-python==2.0.2 
+
+flask==3.0.3
+cassandra-driver==3.29.2
+pandas==2.2.2
+kafka-python==2.0.2
+joblib==1.4.2
+scikit-learn==1.4.2
+flask-cors==4.0.0
+prometheus-client==0.20.0

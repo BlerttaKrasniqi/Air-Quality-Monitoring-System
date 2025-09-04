@@ -76,3 +76,5 @@ query_agg = aggregated_df.writeStream \
     .start()
 
 query_raw.awaitTermination()
+
+

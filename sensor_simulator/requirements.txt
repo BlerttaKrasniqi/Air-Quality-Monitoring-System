@@ -1,2 +1,2 @@
-kafka-python
-faker
+kafka-python==2.0.2
+faker==25.8.0
