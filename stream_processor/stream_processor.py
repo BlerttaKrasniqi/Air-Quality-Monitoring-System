@@ -24,7 +24,7 @@ schema = StructType() \
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
-    .option("subscribe", "air_quality") \
+    .option("subscribe", "sensor-data") \
     .load()
 
 # Parse Kafka JSON messages
