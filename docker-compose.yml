@@ -132,5 +132,23 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  
+  consumer:
+    build:
+      context: ./kafka_consumer
+      dockerfile: Dockerfile
+    environment:
+      KAFKA_BOOTSTRAP: "kafka:9092"
+      KAFKA_TOPIC: "sensor-data"
+      GROUP_ID: "debug-consumer"  
+      LOG_LEVEL: "INFO"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+    profiles: ["debug"]            
+         
+
+
 volumes:
   cassandra_data:
