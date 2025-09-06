@@ -95,16 +95,26 @@ services:
       ]
 
   simulator:
-    build: ./sensor_simulator
+    build: ./sensor_simulator          
     environment:
-      KAFKA_BROKER: kafka:9092
-      TOPIC: air_quality
+      KAFKA_BOOTSTRAP: kafka:9092
+      KAFKA_TOPIC: sensor-data
+      SENSOR_LOCATION: Pristina
+      SENSOR_LAT: "42.6629"
+      SENSOR_LON: "21.1655"
+      SEND_INTERVAL_SEC: "5"
+      GPS_JITTER_METERS: "30"
+      DEVICE_COUNT: "3"                 
+      EVENT_PROB: "0.03"              
+      EVENT_MEAN_DURATION_SEC: "20"
+      SIM_SEED: "42"                  
+      LOG_LEVEL: INFO
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
-  # The web app is your "dashboard" code; we expose it as 'frontend'
+
   frontend:
     build: ./dashboard
     environment:
