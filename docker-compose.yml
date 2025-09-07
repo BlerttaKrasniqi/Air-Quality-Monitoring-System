@@ -98,6 +98,7 @@ services:
         condition: service_started
       cassandra:
         condition: service_healthy
+    restart: unless-stopped
     volumes:
       - ./stream_processor:/opt/spark_app
     command:
