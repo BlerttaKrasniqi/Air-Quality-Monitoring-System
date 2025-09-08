@@ -138,15 +138,15 @@
         });
 
         function updateDashboard(data) {
-            document.getElementById('pm25').textContent = data.pm25;
-            document.getElementById('pm10').textContent = data.pm10;
-            document.getElementById('co2').textContent = data.co2;
+            document.getElementById('pm25').textContent = data.pm25 ?? "--";
+            document.getElementById('pm10').textContent = data.pm10 ?? "--";
+            document.getElementById('co2').textContent = data.co2 ?? 0;
             document.getElementById('temperature').textContent = data.temperature;
-            document.getElementById('humidity').textContent = data.humidity;
+            document.getElementById('humidity').textContent = data.humidity ?? 0;
 
             labels.push(new Date(data.timestamp).toLocaleTimeString());
-            pm25Data.push(data.pm25);
-            co2Data.push(data.co2);
+            pm25Data.push(data.pm25 ?? 0);
+            co2Data.push(data.temperature);
 
             if (labels.length > 20) {
                 labels.shift();
@@ -180,7 +180,10 @@
         async function fetchData() {
             try {
                 const res = await axios.get("/api/realtime-data");
-                updateDashboard(res.data);
+                const latest = res.data[0];
+                if (latest){
+                    updateDashboard(latest);
+                }
             } catch (err) {
                 console.error("Error fetching data:", err);
             }

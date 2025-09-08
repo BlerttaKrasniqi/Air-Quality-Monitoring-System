@@ -50,8 +50,8 @@ services:
     volumes:
       - cassandra_data:/var/lib/cassandra
     environment:
-      MAX_HEAP_SIZE: 1G
-      HEAP_NEWSIZE: 100M
+      MAX_HEAP_SIZE: 256M
+      HEAP_NEWSIZE: 54M
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'DESC KEYSPACES' || exit 1"]
       interval: 15s
