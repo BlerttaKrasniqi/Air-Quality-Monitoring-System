@@ -155,7 +155,14 @@
             }
 
             chart.update();
-            getPredictions(data);
+            getPredictions({
+                pm25: data.pm25,
+                pm10: data.pm10,
+                co2: data.co2,
+                humidity: data.humidity,
+                temperature: data.temperature,
+                timestamp: data.timestamp
+            });
 
             showAlert(data.pm25, data.co2);
         }

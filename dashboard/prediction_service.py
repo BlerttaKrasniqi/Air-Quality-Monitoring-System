@@ -15,8 +15,6 @@ import os
 import json
 import argparse
 from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
-import seaborn as sns
 from prometheus_metrics import (
     db_query_counter, db_query_duration, db_row_count,
     model_training_duration, model_accuracy, model_prediction_duration,
@@ -126,8 +124,16 @@ class OutlierRemover(BaseEstimator, TransformerMixin):
                 z_scores = np.abs((X_copy[col] - self.means[col]) / self.stds[col])
                 outliers = z_scores > self.threshold
 
-                X_copy.loc[outliers & (X_copy[col] > self.means[col]), col] = self.means[col] + self.threshold * self.stds[col]
-                X_copy.loc[outliers & (X_copy[col] < self.means[col]), col] = self.means[col] - self.threshold * self.stds[col]
+                if outliers.any():
+                    logger.info(f"Clipping {outliers.sum()} outliers in column '{col}'")
+
+                # Instead of dropping rows, just clip the values
+                X_copy.loc[outliers & (X_copy[col] > self.means[col]), col] = (
+                    self.means[col] + self.threshold * self.stds[col]
+                )
+                X_copy.loc[outliers & (X_copy[col] < self.means[col]), col] = (
+                    self.means[col] - self.threshold * self.stds[col]
+                )
 
         return X_copy
 
@@ -156,39 +162,43 @@ class AirQualityPredictor:
         self.load_model()
    
     def load_model(self):
-        """Load the trained model and scaler"""
+        """Force load the trained model and log loudly if it fails."""
         try:
-            if (os.path.exists(self.model_path) and 
-                os.path.exists(self.scaler_path) and 
-                os.path.exists(self.preprocessor_path)):
-                
-                self.model = joblib.load(self.model_path)
-                self.scaler = joblib.load(self.scaler_path)
-                self.preprocessor = joblib.load(self.preprocessor_path)
-                
-                self.training_timestamp = datetime.fromtimestamp(
-                    os.path.getmtime(self.model_path)
-                ).isoformat()
-                
-                # Try to load metrics if available
-                metrics_path = os.path.join(os.path.dirname(self.model_path), 'training_metrics.json')
-                if os.path.exists(metrics_path):
-                    with open(metrics_path, 'r') as f:
-                        self.metrics = json.load(f)
-                        
-                # Try to load feature names if available
-                feature_names_path = os.path.join(os.path.dirname(self.model_path), 'feature_names.json')
-                if os.path.exists(feature_names_path):
-                    with open(feature_names_path, 'r') as f:
-                        self.feature_names = json.load(f)
-               
-                logger.info(f"Model loaded successfully from {self.model_path}")
-                return True
-            else:
-                logger.warning("No existing model found. Model needs to be trained.")
-                return False
+            models_dir = "/app/models"
+            self.model_path = os.path.join(models_dir, "air_quality_model.joblib")
+            self.scaler_path = os.path.join(models_dir, "air_quality_scaler.joblib")
+            self.preprocessor_path = os.path.join(models_dir, "air_quality_preprocessor.joblib")
+
+            logger.warning(f"🔎 Attempting to load model from: {self.model_path}")
+
+            # Check all files exist
+            for f in [self.model_path, self.scaler_path, self.preprocessor_path]:
+                if not os.path.exists(f):
+                    raise FileNotFoundError(f"Required file missing: {f}")
+
+            # Load with joblib
+            self.model = joblib.load(self.model_path)
+            logger.warning(f"✅ Model object type: {type(self.model)}")
+
+            self.scaler = joblib.load(self.scaler_path)
+            logger.warning(f"✅ Scaler object type: {type(self.scaler)}")
+
+            self.preprocessor = joblib.load(self.preprocessor_path)
+            logger.warning(f"✅ Preprocessor object type: {type(self.preprocessor)}")
+
+            self.training_timestamp = datetime.fromtimestamp(
+                os.path.getmtime(self.model_path)
+            ).isoformat()
+
+            logger.warning("🎉 Model + Scaler + Preprocessor loaded successfully")
+
+            return True
+
         except Exception as e:
-            logger.error(f"Error loading model: {e}")
+            logger.error(f"❌ Critical error loading model: {e}", exc_info=True)
+            self.model = None
+            self.scaler = None
+            self.preprocessor = None
             return False
    
     def connect_to_cassandra(self):
@@ -214,7 +224,7 @@ class AirQualityPredictor:
     def fetch_data(self, session, start_date=None, end_date=None):
         """Fetch air quality data from Cassandra"""
         try:
-            query = f"SELECT sensor_id, timestamp, temperature, humidity, pm25, pm10, co2 FROM {CASSANDRA_TABLE}"
+            query = f"SELECT id, timestamp, temperature, humidity, pm25, pm10, co2 FROM {CASSANDRA_TABLE}"
            
             # Add date range if specified
             if start_date and end_date:
@@ -227,7 +237,7 @@ class AirQualityPredictor:
                 data = []
                 for row in rows:
                     data.append({
-                        'sensor_id': row.sensor_id,
+                        'id': row.id,
                         'timestamp': row.timestamp,
                         'temperature': row.temperature,
                         'humidity': row.humidity,
@@ -335,22 +345,34 @@ class AirQualityPredictor:
         """Preprocess the data for model training with advanced feature engineering"""
         try:
             # Handle missing values
-            df = df.dropna()
-            logger.info(f"Data shape after dropping NAs: {df.shape}")
+            # Handle missing values
+            for col in ['temperature', 'humidity', 'co2', 'pm25', 'pm10']:
+                if col in df.columns:
+                    if df[col].isnull().any():
+                        if col in ['humidity', 'co2']:
+                            # fill with median (robust to outliers)
+                            df[col].fillna(df[col].median(), inplace=True)
+                        else:
+                            # temperature, pm25, pm10 → fill with mean
+                            df[col].fillna(df[col].mean(), inplace=True)
+
+            logger.info(f"Data shape after imputing NAs: {df.shape}")
+
 
             # Drop identifier columns not useful for training
-            if 'sensor_id' in df.columns:
-                df = df.drop(columns=['sensor_id'])
-                logger.info("Dropped 'sensor_id' column before preprocessing")
+            if 'id' in df.columns:
+                df = df.drop(columns=['id'])
+                logger.info("Dropped 'id' column before preprocessing")
 
             # Remove extreme outliers (5 std)
             for col in ['temperature', 'humidity', 'co2', 'pm25', 'pm10']:
                 if col in df.columns:
                     mean = df[col].mean()
                     std = df[col].std()
-                    df = df[(df[col] > mean - 5 * std) & (df[col] < mean + 5 * std)]
+                    lower, upper = mean - 5 * std, mean + 5 * std
+                    df[col] = df[col].clip(lower, upper)
 
-            logger.info(f"Data shape after removing extreme outliers: {df.shape}")
+            logger.info(f"Data shape after clipping extreme outliers: {df.shape}")
 
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             y = df['pm25'].copy()
@@ -391,9 +413,6 @@ class AirQualityPredictor:
                 'random_forest': RandomForestRegressor(
                     random_state=42, 
                     n_jobs=-1
-                ),
-                'gradient_boosting': GradientBoostingRegressor(
-                    random_state=42
                 )
             }
             
@@ -404,11 +423,6 @@ class AirQualityPredictor:
                     'max_depth': [None, 20, 30],
                     'min_samples_split': [2, 5],
                     'min_samples_leaf': [1, 2]
-                },
-                'gradient_boosting': {
-                    'n_estimators': [100, 200],
-                    'max_depth': [3, 5, 7],
-                    'learning_rate': [0.05, 0.1]
                 }
             }
             
@@ -479,40 +493,6 @@ class AirQualityPredictor:
         except Exception as e:
             logger.error(f"Error training model: {e}")
             raise
-    
-    def plot_feature_importance(self, model, feature_names, output_path):
-        """Plot feature importance for the trained model"""
-        try:
-            if hasattr(model, 'feature_importances_'):
-                # Get feature importances
-                importances = model.feature_importances_
-                
-                # Create a dataframe for better visualization
-                importance_df = pd.DataFrame({
-                    'Feature': feature_names,
-                    'Importance': importances
-                })
-                
-                # Sort by importance
-                importance_df = importance_df.sort_values('Importance', ascending=False)
-                
-                # Plot
-                plt.figure(figsize=(12, 8))
-                sns.barplot(x='Importance', y='Feature', data=importance_df)
-                plt.title('Feature Importance')
-                plt.tight_layout()
-                
-                # Save figure
-                plt.savefig(output_path)
-                logger.info(f"Feature importance plot saved to {output_path}")
-                
-                return importance_df
-            else:
-                logger.warning("Model does not support feature importance")
-                return None
-        except Exception as e:
-            logger.error(f"Error plotting feature importance: {e}")
-            return None
    
     def evaluate_model(self, model, X_test, y_test):
         """Evaluate the trained model with comprehensive metrics"""
@@ -632,8 +612,6 @@ class AirQualityPredictor:
             metrics = self.evaluate_model(model, X_test, y_test)
             
             # Plot and save feature importance
-            os.makedirs(os.path.dirname(self.feature_importance_path), exist_ok=True)
-            self.plot_feature_importance(model, feature_names, self.feature_importance_path)
             
             # Save model and related artifacts
             self.save_model(model, scaler, preprocessor, feature_names, metrics)
@@ -652,55 +630,42 @@ class AirQualityPredictor:
             return None
    
     def preprocess_input(self, data):
-        """Preprocess input data for prediction using the saved preprocessor"""
+        """Preprocess input data for prediction using the saved preprocessor."""
         try:
-            # Convert input to DataFrame if it's a dictionary
+            # Convert dict → DataFrame
             if isinstance(data, dict):
                 data = pd.DataFrame([data])
-            
-            # Ensure timestamp is present
+
+            # Ensure timestamp exists
             if 'timestamp' not in data.columns:
                 data['timestamp'] = datetime.now()
-            
-            # Apply the preprocessor pipeline
+
+            # Apply preprocessing if available
             if self.preprocessor is not None:
                 data_processed = self.preprocessor.transform(data)
             else:
-                # Fall back to basic preprocessing if no preprocessor is available
                 data_processed = data.copy()
-                
-                # Extract datetime features if timestamp exists
-                if 'timestamp' in data_processed.columns:
-                    data_processed['timestamp'] = pd.to_datetime(data_processed['timestamp'])
-                    data_processed['hour'] = data_processed['timestamp'].dt.hour
-                    data_processed['day'] = data_processed['timestamp'].dt.day
-                    data_processed['month'] = data_processed['timestamp'].dt.month
-                    data_processed['day_of_week'] = data_processed['timestamp'].dt.dayofweek
-                    data_processed.drop('timestamp', axis=1, inplace=True)
-            
-            # Ensure all required features exist
+
+            # Reindex to training features if available
             if self.feature_names is not None:
-                for feature in self.feature_names:
-                    if feature not in data_processed.columns:
-                        data_processed[feature] = 0  # Default value for missing features
-                
-                # Select only the features the model was trained on
-                X = data_processed[self.feature_names]
-            else:
-                # If no feature names are available, use all features
-                X = data_processed
-            
-            # Scale features
+                data_processed = pd.DataFrame(data_processed, columns=self.feature_names)
+                data_processed = data_processed.reindex(columns=self.feature_names, fill_value=0)
+
+            # Convert to numpy
+            X_array = data_processed.to_numpy()
+
+            # Scale without feature name checks
             if self.scaler is not None:
-                X_scaled = self.scaler.transform(X)
+                X_scaled = self.scaler.transform(X_array)
             else:
-                X_scaled = X.values
-            
+                X_scaled = X_array
+
             return X_scaled
-        
+
         except Exception as e:
-            logger.error(f"Error preprocessing input data: {e}")
+            logger.error(f"Error preprocessing input data: {e}", exc_info=True)
             raise
+
    
     def predict(self, data):
         """Make predictions using the trained model"""

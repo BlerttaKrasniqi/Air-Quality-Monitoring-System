@@ -147,6 +147,7 @@ services:
     volumes:
       - ./dashboard:/app
       - ./sensor_simulator:/app/sensor_simulator
+      - ./models:/app/models
     depends_on:
       cassandra:
         condition: service_healthy
