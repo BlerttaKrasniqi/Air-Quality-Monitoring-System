@@ -216,13 +216,25 @@ def realtime_data():
 
         # 🔑 Update Prometheus gauges for *all* rows
         for row in payload:
-            sensor_id = str(row.get("id", "unknown"))
+            # prefer explicit 'sensor_id' key, fall back to 'id' for compatibility
+            sid = row.get("sensor_id") or row.get("id") or "unknown"
+            sensor_id = str(sid)
 
             pm25_val = row.get("pm25")
             co2_val = row.get("co2")
 
-            pm25_gauge.labels(sensor_id=sensor_id).set(float(pm25_val) if pm25_val is not None else 0.0)
-            co2_gauge.labels(sensor_id=sensor_id).set(float(co2_val) if co2_val is not None else 0.0)
+            try:
+                pm25_num = float(pm25_val) if pm25_val is not None else 0.0
+            except Exception:
+                pm25_num = 0.0
+
+            try:
+                co2_num = float(co2_val) if co2_val is not None else 0.0
+            except Exception:
+                co2_num = 0.0
+
+            pm25_gauge.labels(sensor_id=sensor_id).set(pm25_num)
+            co2_gauge.labels(sensor_id=sensor_id).set(co2_num)
 
         return jsonify(payload), 200
 
