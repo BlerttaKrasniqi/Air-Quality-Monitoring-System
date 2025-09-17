@@ -129,16 +129,24 @@ schema = StructType([
     StructField("wind_direction", IntegerType()),
     StructField("events", ArrayType(StringType()))
 ])
-
 parsed = (
     raw.select(from_json(col("value").cast("string"), schema).alias("j"))
        .select(
            col("j.timestamp").alias("ts_str"),
-           col("j.pm25").alias("pm25"),
-           col("j.temperature").alias("temperature")
+           col("j.pm25"),
+           col("j.pm10"),
+           col("j.co2"),
+           col("j.temperature"),
+           col("j.humidity"),
+           col("j.wind_speed"),
+           col("j.wind_direction"),
+           col("j.sensor_id"),
+           col("j.location"),
+           col("j.latitude"),
+           col("j.longitude"),
+           col("j.weather"),
+           col("j.events")
        )
-       # ISO-8601 with microseconds and timezone, e.g. 2025-09-07T22:03:16.467687+00:00
-       # Try 6-digit and 3-digit fractional seconds just in case your simulator varies.
        .withColumn(
            "event_time",
            coalesce(
@@ -149,6 +157,7 @@ parsed = (
        .drop("ts_str")
        .filter(col("event_time").isNotNull())
 )
+
 
 # ---------- Windowed aggregates (e.g., 1 minute) ----------
 windowed = (
@@ -187,17 +196,25 @@ CHECKPOINT_AGG =  "/tmp/spark_checkpoints/agg"
 # Optional: also keep a raw mirror of a few fields into Cassandra (if you want to confirm ingest)
 def write_raw_to_cassandra(batch_df, batch_id: int):
     out = (batch_df
-           .select(
-               expr("uuid()").alias("id"),
-               col("event_time").alias("timestamp"),
-               col("pm25").cast("float").alias("pm25"),
-               col("temperature").cast("float").alias("temperature")
-           ))
+       .select(
+           expr("uuid()").alias("id"),
+           col("event_time").alias("timestamp"),
+           col("pm25").cast("float").alias("pm25"),
+           col("pm10").cast("float").alias("pm10"),
+           col("co2").cast("float").alias("co2"),
+           col("temperature").cast("float").alias("temperature"),
+           col("humidity").cast("float").alias("humidity"),
+           col("wind_speed").cast("float").alias("wind_speed"),
+           col("wind_direction").cast("int").alias("wind_direction"),
+           col("location"),
+           col("sensor_id")
+       ))
     (out.write
         .format("org.apache.spark.sql.cassandra")
         .mode("append")
         .options(table="sensor_data", keyspace="air_monitoring")
         .save())
+
 
 
 

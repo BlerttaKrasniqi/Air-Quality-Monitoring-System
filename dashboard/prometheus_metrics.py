@@ -57,6 +57,21 @@ model_accuracy = Gauge(
     registry=registry
 )
 
+# Air quality sensor values
+pm25_gauge = Gauge(
+    'air_quality_pm25',
+    'Latest PM2.5 value in µg/m³',
+    ['sensor_id'],
+    registry=registry
+)
+
+co2_gauge = Gauge(
+    'air_quality_co2',
+    'Latest CO₂ concentration in ppm',
+    ['sensor_id'],
+    registry=registry
+)
+
 # Database metrics
 db_query_counter = Counter(
     'air_quality_db_queries_total',

@@ -1,87 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Smart Air Quality Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            background: #cbf5f6;
-        }
-
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-
-        .metrics {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 30px;
-            flex-wrap: wrap;
-        }
-
-        .metric {
-            background: #f67676;
-            padding: 15px 20px;
-            margin: 10px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(99, 3, 3, 0.1);
-            text-align: center;
-            min-width: 140px;
-            font-weight: bold;
-        }
-
-        .alert-box {
-            text-align: center;
-            font-weight: bold;
-            margin-top: 20px;
-            padding: 10px;
-            border-radius: 6px;
-            display: none;
-        }
-
-        .alert-high { background-color: #f8d7da; color: #721c24; }
-        .alert-medium { background-color: #fff3cd; color: #856404; }
-        .alert-good { background-color: #d4edda; color: #155724; }
-
-        #chart-container {
-            max-width: 900px;
-            margin: 40px auto;
-        }
-        .predicted-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #28a745;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Smart Air Quality Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #cbf5f6; }
+    h1 { text-align: center; color: #333; margin-bottom: 20px; }
+    .metrics { display: flex; justify-content: space-around; margin-top: 20px; flex-wrap: wrap; }
+    .metric { background: #f67676; padding: 15px 20px; margin: 10px; border-radius: 10px; box-shadow: 0 0 10px rgba(99, 3, 3, 0.1); text-align: center; min-width: 140px; font-weight: bold; color: white; }
+    .alert-box { text-align: center; font-weight: bold; margin-top: 20px; padding: 10px; border-radius: 6px; display: none; }
+    .alert-high { background-color: #f8d7da; color: #721c24; }
+    .alert-medium { background-color: #fff3cd; color: #856404; }
+    .alert-good { background-color: #d4edda; color: #155724; }
+    .predicted-value { font-size: 24px; font-weight: bold; color: #28a745; }
+    canvas { background: #fff; border-radius: 8px; padding: 5px; }
+  </style>
 </head>
+            
 <body>
-    <h1>🌬️ Smart Air Quality Dashboard</h1>
+        <h1>🌬️ Smart Air Quality Dashboard</h1>
 
-    <div class="metrics">
-        <div class="metric">PM2.5: <span id="pm25">--</span></div>
-        <div class="metric">PM10: <span id="pm10">--</span></div>
-        <div class="metric">CO2: <span id="co2">--</span></div>
-        <div class="metric">Temperature: <span id="temperature">--</span></div>
-        <div class="metric">Humidity: <span id="humidity">--</span></div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex gap-2 align-items-center">
+                <label class="m-0 small">From</label>
+                <input id="export-start" type="datetime-local" class="form-control form-control-sm" style="width:200px;" />
+                <label class="m-0 small">To</label>
+                <input id="export-end" type="datetime-local" class="form-control form-control-sm" style="width:200px;" />
+                <input id="export-sensor" placeholder="sensor_id (optional)" class="form-control form-control-sm" style="width:160px;" />
+                <button id="exportBtn" class="btn btn-sm btn-outline-secondary">Export CSV</button>
+                <a class="btn btn-sm btn-outline-info" href="/metrics" target="_blank">Metrics</a>
+            </div>
+            <div class="text-end small text-muted">Last update: <span id="last-updated">--:--:--</span></div>
+        </div>
+
+        <div class="metrics">
+    <div class="metric">PM2.5: <span id="pm25">--</span> <span class="small" id="trend-pm25"></span></div>
+    <div class="metric">PM10: <span id="pm10">--</span> <span class="small" id="trend-pm10"></span></div>
+    <div class="metric">CO2: <span id="co2">--</span> <span class="small" id="trend-co2"></span></div>
+    <div class="metric">Temperature: <span id="temperature">--</span> <span class="small" id="trend-temperature"></span></div>
+    <div class="metric">Humidity: <span id="humidity">--</span> <span class="small" id="trend-humidity"></span></div>
     </div>
 
     <div id="alertBox" class="alert-box"></div>
 
-    <div id="chart-container">
-        <canvas id="realtimeChart"></canvas>
-    </div>
+        <div class="my-3 text-end">
+            <span id="service-status" class="badge bg-secondary">Service: unknown</span>
+        </div>
 
-    <!-- AI Prediction Section -->
+      <div class="container mt-4">
+      <div class="row">
+      <div class="col-md-6"><canvas id="realtimeChart"></canvas></div>
+      <div class="col-md-6"><canvas id="tempHumChart"></canvas></div>
+    </div>
+  </div>
+
     <div class="container">
-        <h3 class="mb-3 text-center">AI Predictions</h3>
-        <div class="row" id="predictionSection">
-            <!-- Current Prediction -->
+        <h3 class="mb-3 text-center pt-4">AI Predictions</h3>
+                <div class="row" id="predictionSection">
             <div class="col-md-4">
                 <div class="card sensor-card p-3 mb-3">
                     <h5 class="text-center">Predicted PM2.5</h5>
@@ -90,7 +68,6 @@
                 </div>
             </div>
             
-            <!-- Prediction Chart -->
             <div class="col-md-8">
                 <div class="card sensor-card p-3 mb-3">
                     <h5 class="text-center">24-Hour Forecast</h5>
@@ -103,10 +80,18 @@
         </div>
     </div>
 
+        <div class="container">
+            <h4 class="text-center mb-2">Daily Averages (Today vs Yesterday)</h4>
+            <div class="card p-3 mb-4">
+                <canvas id="dailyAvgChart" style="height:200px;"></canvas>
+            </div>
+        </div>
+
     <script>
-        const labels = [];
+    const labels = [];
         const pm25Data = [];
         const co2Data = [];
+    let lastTimestamp = null;
 
         const chart = new Chart(document.getElementById("realtimeChart"), {
             type: 'line',
@@ -137,6 +122,32 @@
             }
         });
 
+          const tempHumChart = new Chart(document.getElementById("tempHumChart"), {
+            type: 'line',
+            data: { labels: [], datasets: [
+            { label: 'Temperature (°C)', data: [], borderColor: 'orange', tension: 0.3 },
+            { label: 'Humidity (%)', data: [], borderColor: 'blue', tension: 0.3 }
+            ]},
+            options: { responsive: true }
+        });
+
+                let dailyAvgChart = null;
+                const dailyAvgCanvas = document.getElementById('dailyAvgChart');
+                if (dailyAvgCanvas) {
+                    const dailyAvgCtx = dailyAvgCanvas.getContext('2d');
+                    dailyAvgChart = new Chart(dailyAvgCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['PM2.5', 'PM10', 'CO2', 'Temperature', 'Humidity'],
+                        datasets: [
+                            { label: 'Today', data: [0,0,0,0,0], backgroundColor: 'rgba(54,162,235,0.6)' },
+                            { label: 'Yesterday', data: [0,0,0,0,0], backgroundColor: 'rgba(201,203,207,0.6)' }
+                        ]
+                    },
+                    options: { responsive: true }
+                    });
+                }
+
         function updateDashboard(data) {
             document.getElementById('pm25').textContent = data.pm25 ?? "--";
             document.getElementById('pm10').textContent = data.pm10 ?? "--";
@@ -146,7 +157,7 @@
 
             labels.push(new Date(data.timestamp).toLocaleTimeString());
             pm25Data.push(data.pm25 ?? 0);
-            co2Data.push(data.temperature);
+            co2Data.push(data.co2);
 
             if (labels.length > 20) {
                 labels.shift();
@@ -155,6 +166,17 @@
             }
 
             chart.update();
+
+            tempHumChart.data.labels.push(new Date(data.timestamp).toLocaleTimeString());
+            tempHumChart.data.datasets[0].data.push(data.temperature);
+            tempHumChart.data.datasets[1].data.push(data.humidity);
+            if (tempHumChart.data.labels.length > 20) {
+            tempHumChart.data.labels.shift();
+            tempHumChart.data.datasets[0].data.shift();
+            tempHumChart.data.datasets[1].data.shift();
+            }
+            tempHumChart.update();
+           
             getPredictions({
                 pm25: data.pm25,
                 pm10: data.pm10,
@@ -163,6 +185,9 @@
                 temperature: data.temperature,
                 timestamp: data.timestamp
             });
+
+            lastTimestamp = data.timestamp;
+            document.getElementById('last-updated').textContent = new Date(data.timestamp).toLocaleTimeString();
 
             showAlert(data.pm25, data.co2);
         }
@@ -203,7 +228,6 @@
                     debugElement.textContent = 'Fetching predictions...';
                 }
                 
-                // Use the provided sensor data or create default data
                 const latestData = sensorData || {
                     temperature: parseFloat(document.getElementById("temperature").innerText || '25'),
                     humidity: parseFloat(document.getElementById("humidity").innerText || '60'),
@@ -211,7 +235,6 @@
                     timestamp: document.getElementById("timestamp").innerText || new Date().toISOString()
                 };
 
-                // Call the prediction API
                 const predictionResponse = await axios.post('/api/predict', latestData);
                 
                 if (predictionResponse.data.error) {
@@ -222,11 +245,9 @@
                     return;
                 }
                 
-                // Display the prediction in the UI
                 const predictedValue = predictionResponse.data.predicted_pm25.toFixed(2);
                 document.getElementById('predicted-pm25').textContent = predictedValue;
                 
-                // Get future predictions for chart
                 const futureResponse = await axios.post('/api/predict_future', latestData);
                 
                 if (debugElement) {
@@ -260,7 +281,6 @@
             
             const values = predictions.map(p => p.predicted_pm25);
             
-            // Create or update the chart
             if (!window.predictionChart) {
                 const ctx = document.getElementById('prediction-chart').getContext('2d');
                 window.predictionChart = new Chart(ctx, {
@@ -319,9 +339,8 @@
             }
         }
         
-        async function trainAIModel() {
+    async function trainAIModel() {
             try {
-                // Show training status
                 const statusElement = document.getElementById('training-status');
                 if (statusElement) {
                     statusElement.textContent = 'Training in progress... This may take several minutes.';
@@ -330,7 +349,7 @@
                 
                 const response = await axios.post('/api/train-model', {
                     data_source: 'cassandra',
-                    days: 2 // Number of days of data to use for training
+                    days: 2
                 });
                 
                 if (response.data.status === 'success') {
@@ -341,7 +360,6 @@
                         alert('Model training started successfully!');
                     }
                     
-                    // Check training status periodically
                     checkTrainingStatus();
                 } else {
                     if (statusElement) {
@@ -364,8 +382,7 @@
             }
         }
 
-        async function checkTrainingStatus() {
-            // Check training status every 30 seconds
+    async function checkTrainingStatus() {
             const checkInterval = setInterval(async () => {
                 try {
                     const response = await axios.get('/api/model-info');
@@ -376,26 +393,22 @@
                         
                         const statusElement = document.getElementById('training-status');
                         
-                        // If timestamp has changed, training is complete
                         if (response.data.timestamp && response.data.timestamp !== lastTimestamp) {
                             if (statusElement) {
                                 statusElement.textContent = `Model trained successfully! Accuracy: ${response.data.accuracy || 'N/A'}`;
                                 statusElement.className = 'status-message bg-success text-white';
                             }
                             
-                            // Stop checking
                             clearInterval(checkInterval);
                         }
                         
-                        // Store timestamp for comparison
                         lastTimestamp = response.data.timestamp;
                     }
                 } catch (error) {
                     console.error('Error checking model status:', error);
                 }
-            }, 30000); // Every 30 seconds
+            }, 30000);
             
-            // Stop checking after 30 minutes (training should be done by then)
             setTimeout(() => {
                 clearInterval(checkInterval);
             }, 30 * 60 * 1000);
@@ -409,7 +422,6 @@
                     document.getElementById('model-timestamp').textContent = response.data.timestamp || 'Not trained';
                     document.getElementById('model-accuracy').textContent = response.data.accuracy ? `${response.data.accuracy}` : 'N/A';
                     
-                    // Store timestamp for comparison
                     lastTimestamp = response.data.timestamp;
                 }
             } catch (error) {
@@ -417,9 +429,7 @@
             }
         }
         
-        // Initialize the dashboard
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize chart with empty data
             const ctx = document.getElementById('prediction-chart').getContext('2d');
             window.predictionChart = new Chart(ctx, {
                 type: 'line',
@@ -463,15 +473,144 @@
                 }
             });
             
-            // Fetch model info
             fetchModelInfo();
-            
-            // Update data every 5 seconds
-            setInterval(loadSensorData, 5000);
-        });
 
-        setInterval(fetchData, 5000);
-        fetchData(); // initial call
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) refreshBtn.addEventListener('click', () => { fetchData(); if (dailyAvgChart) loadDailyAverages(); fetchModelInfo(); healthCheck(); });
+            const exportBtn = document.getElementById('exportBtn');
+            if (exportBtn) exportBtn.addEventListener('click', exportCsv);
+            const trainBtn = document.getElementById('trainBtn');
+            if (trainBtn) trainBtn.addEventListener('click', () => { trainAIModel(); });
+
+            setInterval(fetchData, 5000);
+
+            if (dailyAvgChart) {
+                setInterval(loadDailyAverages, 5 * 60 * 1000);
+            }
+
+            fetchData();
+            if (dailyAvgChart) loadDailyAverages();
+            healthCheck();
+        });
+        
+        async function loadDailyAverages() {
+  try {
+        if (!dailyAvgChart) return;
+        const res = await axios.get("/api/daily-averages");
+        const data = res.data || {};
+
+        const today = data.today || {};
+        const yesterday = data.yesterday || {};
+
+        dailyAvgChart.data.datasets[0].data = [
+            today.pm25 ?? 0, today.pm10 ?? 0, today.co2 ?? 0, today.temperature ?? 0, today.humidity ?? 0
+        ];
+        dailyAvgChart.data.datasets[1].data = [
+            yesterday.pm25 ?? 0, yesterday.pm10 ?? 0, yesterday.co2 ?? 0, yesterday.temperature ?? 0, yesterday.humidity ?? 0
+        ];
+        dailyAvgChart.update();
+
+        function formatTrend(todayVal, yesterdayVal) {
+            if (yesterdayVal == null || isNaN(Number(yesterdayVal))) {
+                return '<span class="text-muted">-</span>';
+            }
+            const t = Number(todayVal) || 0;
+            const y = Number(yesterdayVal) || 0;
+            if (y === 0) {
+                if (t === 0) return '<span class="text-muted">0%</span>';
+                return '<span class="text-success">▲ ' + (t>0? '∞' : '0') + '</span>';
+            }
+            const pct = ((t - y) / Math.abs(y)) * 100;
+            const arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '');
+            const cls = pct > 0 ? 'text-success' : (pct < 0 ? 'text-danger' : 'text-muted');
+            return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+        }
+
+        document.getElementById('trend-pm25').innerHTML = formatTrend(today.pm25, yesterday.pm25);
+        document.getElementById('trend-pm10').innerHTML = formatTrend(today.pm10, yesterday.pm10);
+        document.getElementById('trend-co2').innerHTML = formatTrend(today.co2, yesterday.co2);
+        document.getElementById('trend-temperature').innerHTML = formatTrend(today.temperature, yesterday.temperature);
+        document.getElementById('trend-humidity').innerHTML = formatTrend(today.humidity, yesterday.humidity);
+  } catch (err) {
+    console.error("Error fetching daily averages:", err);
+  }
+}
+
+
+async function healthCheck() {
+    try {
+        const res = await axios.get('/health');
+        const badge = document.getElementById('service-status');
+        if (res.status === 200) {
+            badge.textContent = 'Service: healthy';
+            badge.className = 'badge bg-success';
+        } else {
+            badge.textContent = 'Service: unhealthy';
+            badge.className = 'badge bg-danger';
+        }
+    } catch (err) {
+        const badge = document.getElementById('service-status');
+        badge.textContent = 'Service: down';
+        badge.className = 'badge bg-danger';
+        console.error('Health check failed', err);
+    }
+}
+
+function exportCsv() {
+    try {
+        const startEl = document.getElementById('export-start');
+        const endEl = document.getElementById('export-end');
+        const sensorEl = document.getElementById('export-sensor');
+
+        if (startEl && endEl && startEl.value && endEl.value) {
+            const start = new Date(startEl.value).toISOString();
+            const end = new Date(endEl.value).toISOString();
+            const sensor = sensorEl && sensorEl.value ? sensorEl.value : null;
+
+            let url = `/api/export-csv?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+            if (sensor) url += `&sensor_id=${encodeURIComponent(sensor)}`;
+
+            axios.get(url, { responseType: 'blob' })
+                .then(resp => {
+                    const blob = new Blob([resp.data], { type: 'text/csv' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    const fileName = `air_quality_${start.split('T')[0]}_to_${end.split('T')[0]}.csv`;
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(link.href);
+                })
+                .catch(err => {
+                    console.error('Error downloading CSV', err);
+                    alert('Error downloading CSV. Check server logs.');
+                });
+            return;
+        }
+
+        const rows = [['metric','value']];
+        rows.push(['pm25', document.getElementById('pm25').textContent]);
+        rows.push(['pm10', document.getElementById('pm10').textContent]);
+        rows.push(['co2', document.getElementById('co2').textContent]);
+        rows.push(['temperature', document.getElementById('temperature').textContent]);
+        rows.push(['humidity', document.getElementById('humidity').textContent]);
+
+        const csv = rows.map(r => r.join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `air_quality_snapshot_${new Date().toISOString()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Error exporting CSV', err);
+        alert('Could not export CSV.');
+    }
+}
 
     </script>
 </body>

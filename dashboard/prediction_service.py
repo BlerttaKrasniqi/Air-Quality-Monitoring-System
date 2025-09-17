@@ -186,6 +186,21 @@ class AirQualityPredictor:
             self.preprocessor = joblib.load(self.preprocessor_path)
             logger.warning(f"✅ Preprocessor object type: {type(self.preprocessor)}")
 
+            # Try to load feature names and training metrics saved alongside the model
+            feature_names_path = os.path.join(os.path.dirname(self.model_path), 'feature_names.json')
+            metrics_path = os.path.join(os.path.dirname(self.model_path), 'training_metrics.json')
+            try:
+                if os.path.exists(feature_names_path):
+                    with open(feature_names_path, 'r') as f:
+                        self.feature_names = json.load(f)
+                    logger.warning(f"✅ Loaded feature names ({len(self.feature_names)}): {self.feature_names}")
+                if os.path.exists(metrics_path):
+                    with open(metrics_path, 'r') as f:
+                        self.metrics = json.load(f)
+                    logger.warning(f"✅ Loaded training metrics: {self.metrics}")
+            except Exception as e:
+                logger.warning(f"Could not load feature_names or metrics: {e}")
+
             self.training_timestamp = datetime.fromtimestamp(
                 os.path.getmtime(self.model_path)
             ).isoformat()
@@ -616,7 +631,6 @@ class AirQualityPredictor:
             # Save model and related artifacts
             self.save_model(model, scaler, preprocessor, feature_names, metrics)
             
-            # Update instance variables
             self.model = model
             self.scaler = scaler
             self.preprocessor = preprocessor
@@ -630,9 +644,9 @@ class AirQualityPredictor:
             return None
    
     def preprocess_input(self, data):
-        """Preprocess input data for prediction using the saved preprocessor."""
+        """Preprocess input data for prediction using the saved preprocessor.
+        """
         try:
-            # Convert dict → DataFrame
             if isinstance(data, dict):
                 data = pd.DataFrame([data])
 
@@ -646,15 +660,36 @@ class AirQualityPredictor:
             else:
                 data_processed = data.copy()
 
-            # Reindex to training features if available
+            # Normalize transformed output to a DataFrame
+            if isinstance(data_processed, np.ndarray):
+                if self.feature_names is not None:
+                    data_processed = pd.DataFrame(data_processed, columns=self.feature_names)
+                else:
+                    data_processed = pd.DataFrame(data_processed)
+            else:
+                data_processed = pd.DataFrame(data_processed)
+
             if self.feature_names is not None:
-                data_processed = pd.DataFrame(data_processed, columns=self.feature_names)
+                for col in self.feature_names:
+                    if col not in data_processed.columns:
+                        data_processed[col] = 0
                 data_processed = data_processed.reindex(columns=self.feature_names, fill_value=0)
 
-            # Convert to numpy
-            X_array = data_processed.to_numpy()
+            data_processed = data_processed.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-            # Scale without feature name checks
+            # Log range of input features for debugging
+            try:
+                mins = data_processed.min().to_dict()
+                maxs = data_processed.max().to_dict()
+                logger.debug(f"Input feature mins: {mins}")
+                logger.debug(f"Input feature maxs: {maxs}")
+            except Exception:
+                logger.debug("Could not compute input feature ranges")
+
+            # Convert to numpy for scaler/model
+            X_array = data_processed.to_numpy(dtype=float)
+
+            # Scale
             if self.scaler is not None:
                 X_scaled = self.scaler.transform(X_array)
             else:
@@ -672,35 +707,29 @@ class AirQualityPredictor:
         try:
             if self.model is None:
                 raise ValueError("Model not loaded. Please train or load a model first.")
-                
-            # Preprocess the input data
+
             X_scaled = self.preprocess_input(data)
-            
-            # Make prediction with timing
+            logger.debug(f"Preprocessed input shape: {getattr(X_scaled, 'shape', 'unknown')}")
+            try:
+                if self.feature_names is not None:
+                    logger.debug(f"Feature names used for prediction: {self.feature_names}")
+            except Exception:
+                pass
+
             with TimerContextManager(model_prediction_duration, {'model_type': 'advanced_model'}):
                 predictions = self.model.predict(X_scaled)
-            
-            # Ensure predictions are non-negative
-            predictions = np.maximum(predictions, 0)
-            
-            return predictions[0] if len(predictions) == 1 else predictions
-        
-        except Exception as e:
-            logger.error(f"Error making prediction: {e}")
-            raise
-   
-    def predict_future(self, current_data, hours_ahead=24):
-        """Predict air quality for future hours with uncertainty estimates"""
-        try:
-            if self.model is None:
-                raise ValueError("Model not loaded. Please train or load a model first.")
-            
-            logger.info(f"Model type during predict_future: {type(self.model)}")
 
-            # Check if the model supports uncertainty estimation
+            logger.debug(f"Raw model predictions: {predictions}")
+
+            predictions = np.maximum(predictions, 0)
+            return predictions[0] if len(predictions) == 1 else predictions
+
+        except Exception as e:
+            logger.error(f"Error making prediction: {e}", exc_info=True)
+            raise
+
             provides_uncertainty = hasattr(self.model, 'estimators_') and isinstance(self.model, RandomForestRegressor)
 
-            # Prepare base data
             if isinstance(current_data, dict):
                 base_data = current_data.copy()
                 if 'timestamp' not in base_data:
@@ -710,19 +739,17 @@ class AirQualityPredictor:
                 if 'timestamp' not in base_data:
                     base_data['timestamp'] = datetime.now()
 
-            # Ensure timestamp is a datetime object
             if isinstance(base_data['timestamp'], str):
                 base_data['timestamp'] = pd.to_datetime(base_data['timestamp'])
 
             future_predictions = []
-            current_time = base_data['timestamp']
+            base_time = base_data['timestamp']
 
-            for i in range(hours_ahead):
-                future_time = current_time + pd.Timedelta(hours=i)
+            for i in range(1, int(hours_ahead) + 1):
+                future_time = base_time + pd.Timedelta(hours=i)
                 prediction_data = base_data.copy()
                 prediction_data['timestamp'] = future_time
 
-                # Update time-based features if available
                 prediction_data['hour'] = future_time.hour
                 prediction_data['day'] = future_time.day
                 prediction_data['month'] = future_time.month
@@ -730,12 +757,20 @@ class AirQualityPredictor:
 
                 # Make prediction
                 predicted_value = self.predict(prediction_data)
+
+                try:
+                    predicted_value = float(predicted_value)
+                except Exception:
+
+                    predicted_value = float(np.asarray(predicted_value).ravel()[0])
+
+                predicted_value = max(0.0, predicted_value)
+
                 prediction_entry = {
                     'timestamp': future_time,
                     'predicted_pm25': predicted_value
                 }
 
-                # If model supports uncertainty, estimate it
                 if provides_uncertainty:
                     X_scaled = self.preprocess_input(prediction_data)
                     
@@ -757,6 +792,16 @@ class AirQualityPredictor:
 
                 future_predictions.append(prediction_entry)
 
+                try:
+                    base_data['pm25'] = predicted_value
+
+                    if 'pm10' in base_data:
+                        base_data['pm10'] = predicted_value * 1.5
+
+                    base_data['timestamp'] = future_time
+                except Exception as e:
+                    logger.debug(f"Could not update base_data for next-step prediction: {e}")
+
             return future_predictions
 
         except Exception as e:
@@ -776,14 +821,12 @@ class AirQualityPredictor:
                 "features": None
             }
         
-        # Get model type
         model_type = type(self.model).__name__
         
-        # Get feature importance if available
         feature_importance = None
         if hasattr(self.model, 'feature_importances_') and self.feature_names is not None:
             importance_dict = dict(zip(self.feature_names, self.model.feature_importances_))
-            # Sort by importance
+
             feature_importance = dict(sorted(importance_dict.items(), key=lambda x: x[1], reverse=True))
         
         return {
@@ -797,7 +840,6 @@ class AirQualityPredictor:
         }
 
 
-# For command-line usage
 def parse_args():
     parser = argparse.ArgumentParser(description='Advanced Air Quality AI System')
     parser.add_argument('--mode', type=str, choices=['train', 'predict'],
@@ -815,11 +857,9 @@ def parse_args():
     return parser.parse_args()
 
 
-# Example usage
 if __name__ == "__main__":
     args = parse_args()
     
-    # Create the AI system
     air_quality_ai = AirQualityPredictor(
         model_path=args.model_path,
         scaler_path=args.scaler_path,
@@ -827,7 +867,7 @@ if __name__ == "__main__":
     )
     
     if args.mode == 'train':
-        # Train the model
+      
         metrics = air_quality_ai.train(data_source=args.data_source, days=args.days)
         if metrics:
             print(f"Training completed successfully. R² Score: {metrics['r2_score']:.4f}")
@@ -844,11 +884,10 @@ if __name__ == "__main__":
         }
         
         try:
-            # Make a prediction
+
             prediction = air_quality_ai.predict(sample_data)
             print(f"Predicted PM2.5: {prediction:.2f}")
             
-            # Predict for the next 24 hours
             future_predictions = air_quality_ai.predict_future(sample_data, hours_ahead=24)
             for pred in future_predictions:
                 if 'uncertainty' in pred:
