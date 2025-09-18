@@ -159,7 +159,7 @@ parsed = (
 )
 
 
-# ---------- Windowed aggregates (e.g., 1 minute) ----------
+
 windowed = (
     parsed
     .withWatermark("event_time", "2 minutes")
@@ -167,10 +167,7 @@ windowed = (
     .agg(
         avg("pm25").alias("avg_pm25"),
         avg("temperature").alias("avg_temp"),
-        # if you want to fill the other avg_* later, add them here too
-        # avg("pm10").alias("avg_pm10"),
-        # avg("co2").alias("avg_co2"),
-        # avg("humidity").alias("avg_humidity"),
+     
     )
     .select(
         expr("uuid()").alias("id"),

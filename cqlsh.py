@@ -1,20 +1,4 @@
-#!/usr/bin/python3
 
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 import cmd
 import codecs
@@ -40,7 +24,7 @@ from uuid import UUID
 if sys.version_info < (3, 6):
     sys.exit("\ncqlsh requires Python 3.6+\n")
 
-# see CASSANDRA-10428
+
 if platform.python_implementation().startswith('Jython'):
     sys.exit("\nCQL Shell does not run on Jython\n")
 
@@ -51,9 +35,7 @@ version = "6.1.0"
 
 readline = None
 try:
-    # check if tty first, cause readline doesn't check, and only cares
-    # about $TERM. we don't want the funky escape code stuff to be
-    # output if not a tty.
+
     if sys.stdin.isatty():
         import readline
 except ImportError:
@@ -64,33 +46,27 @@ CQL_LIB_PREFIX = 'cassandra-driver-internal-only-'
 CASSANDRA_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..')
 CASSANDRA_CQL_HTML_FALLBACK = 'https://cassandra.apache.org/doc/latest/cassandra/cql/cql_singlefile.html'
 
-# default location of local CQL.html
+
 if os.path.exists(CASSANDRA_PATH + '/doc/cql3/CQL.html'):
-    # default location of local CQL.html
+    
     CASSANDRA_CQL_HTML = 'file://' + CASSANDRA_PATH + '/doc/cql3/CQL.html'
 elif os.path.exists('/usr/share/doc/cassandra/CQL.html'):
-    # fallback to package file
+
     CASSANDRA_CQL_HTML = 'file:///usr/share/doc/cassandra/CQL.html'
 else:
-    # fallback to online version
+  
     CASSANDRA_CQL_HTML = CASSANDRA_CQL_HTML_FALLBACK
 
-# On Linux, the Python webbrowser module uses the 'xdg-open' executable
-# to open a file/URL. But that only works, if the current session has been
-# opened from _within_ a desktop environment. I.e. 'xdg-open' will fail,
-# if the session's been opened via ssh to a remote box.
-#
+
 try:
     webbrowser.register_standard_browsers()  # registration is otherwise lazy in Python3
 except AttributeError:
     pass
 if webbrowser._tryorder and webbrowser._tryorder[0] == 'xdg-open' and os.environ.get('XDG_DATA_DIRS', '') == '':
-    # only on Linux (some OS with xdg-open)
+  
     webbrowser._tryorder.remove('xdg-open')
     webbrowser._tryorder.append('xdg-open')
 
-# use bundled lib for python-cql if available. if there
-# is a ../lib dir, use bundled libs there preferentially.
 ZIPLIB_DIRS = [os.path.join(CASSANDRA_PATH, 'lib')]
 
 if platform.system() == 'Linux':
@@ -104,7 +80,7 @@ def find_zip(libprefix):
     for ziplibdir in ZIPLIB_DIRS:
         zips = glob(os.path.join(ziplibdir, libprefix + '*.zip'))
         if zips:
-            return max(zips)   # probably the highest version, if multiple
+            return max(zips)   
 
 
 cql_zip = find_zip(CQL_LIB_PREFIX)
@@ -112,7 +88,7 @@ if cql_zip:
     ver = os.path.splitext(os.path.basename(cql_zip))[0][len(CQL_LIB_PREFIX):]
     sys.path.insert(0, os.path.join(cql_zip, 'cassandra-driver-' + ver))
 
-# the driver needs dependencies
+
 third_parties = ('six-', 'pure_sasl-')
 
 for lib in third_parties:
@@ -139,8 +115,6 @@ from cassandra.policies import WhiteListRoundRobinPolicy
 from cassandra.query import SimpleStatement, ordered_dict_factory, TraceUnavailable
 from cassandra.util import datetime_from_timestamp
 
-# cqlsh should run correctly when run out of a Cassandra source tree,
-# out of an unpacked Cassandra tarball, and after a proper package install.
 cqlshlibdir = os.path.join(CASSANDRA_PATH, 'pylib')
 if os.path.isdir(cqlshlibdir):
     sys.path.insert(0, cqlshlibdir)

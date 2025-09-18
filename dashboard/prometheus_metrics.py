@@ -3,14 +3,14 @@ import time
 import threading
 import logging
 
-# Set up logging
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Create a registry
+
 registry = CollectorRegistry()
 
-# API request metrics
+
 http_request_counter = Counter(
     'air_quality_http_requests_total',
     'Total number of HTTP requests',
@@ -26,7 +26,7 @@ http_request_duration = Histogram(
     registry=registry
 )
 
-# Model metrics
+
 model_prediction_counter = Counter(
     'air_quality_model_predictions_total',
     'Total number of model predictions',

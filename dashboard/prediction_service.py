@@ -186,7 +186,7 @@ class AirQualityPredictor:
             self.preprocessor = joblib.load(self.preprocessor_path)
             logger.warning(f"✅ Preprocessor object type: {type(self.preprocessor)}")
 
-            # Try to load feature names and training metrics saved alongside the model
+           
             feature_names_path = os.path.join(os.path.dirname(self.model_path), 'feature_names.json')
             metrics_path = os.path.join(os.path.dirname(self.model_path), 'training_metrics.json')
             try:
@@ -248,7 +248,6 @@ class AirQualityPredictor:
             with TimerContextManager(db_query_duration, {'query_type': 'fetch_sensor_data'}):
                 rows = session.execute(query)
                
-                # Convert to pandas DataFrame
                 data = []
                 for row in rows:
                     data.append({
@@ -263,7 +262,7 @@ class AirQualityPredictor:
                
                 df = pd.DataFrame(data)
            
-            # Record metrics
+         
             db_query_counter.labels(query_type='fetch_sensor_data', status='success').inc()
             db_row_count.labels(query_type='fetch_sensor_data').observe(len(df))
            

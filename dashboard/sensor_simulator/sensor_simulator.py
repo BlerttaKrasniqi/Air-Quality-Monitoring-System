@@ -17,19 +17,17 @@ from faker import Faker
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger("smart-sensor")
 
-# -------------------- Config via ENV --------------------
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "127.0.0.1:9092")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "sensor-data")
 
-# Local timezone offset hours for daily temp peak alignment (e.g., CEST=2, CET=1)
+
 LOCAL_TZ_OFFSET_HOURS = float(os.getenv("LOCAL_TZ_OFFSET_HOURS", "2"))
 
-# Temperature calibration knobs
-CALIB_TEMP_BIAS = float(os.getenv("CALIB_TEMP_BIAS", "0.0"))    # constant offset °C
-CALIB_TEMP_GAIN = float(os.getenv("CALIB_TEMP_GAIN", "1.0"))    # multiplicative gain
-REAL_TEMP_HINT = os.getenv("REAL_TEMP_HINT")                    # optional live hint as °C string
-EMA_ALPHA = float(os.getenv("CALIB_EMA_ALPHA", "0.15"))         # how fast to follow the hint (0..1)
-EMA_MAX_ABS = float(os.getenv("CALIB_EMA_MAX_ABS", "5.0"))      # clamp of auto-bias |°C|
+CALIB_TEMP_BIAS = float(os.getenv("CALIB_TEMP_BIAS", "0.0"))   
+CALIB_TEMP_GAIN = float(os.getenv("CALIB_TEMP_GAIN", "1.0"))   
+REAL_TEMP_HINT = os.getenv("REAL_TEMP_HINT")                   
+EMA_ALPHA = float(os.getenv("CALIB_EMA_ALPHA", "0.15"))         
+EMA_MAX_ABS = float(os.getenv("CALIB_EMA_MAX_ABS", "5.0"))     
 
 class SmartAirQualitySensor:
     def __init__(self, config):
@@ -57,14 +55,14 @@ class SmartAirQualitySensor:
             10: (8, 22),  11: (3, 14),  12: (-2, 7),
         }
 
-        # Short memory for drifting signals
+    
         self.state = {"pm25": 30.0, "pm10": 60.0, "co2": 410.0, "temperature": 20.0, "humidity": 65.0}
         self.history = {k: deque(maxlen=100) for k in self.state}
 
-        # Auto-correction bias that slowly follows REAL_TEMP_HINT
+       
         self._ema_bias = 0.0
 
-        # Kafka
+      
         self.producer = KafkaProducer(
             bootstrap_servers=[KAFKA_BOOTSTRAP],
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
@@ -72,7 +70,6 @@ class SmartAirQualitySensor:
             retries=6,
         )
 
-        # background events
         self.events = []
         self.running = True
         Thread(target=self._event_loop, daemon=True).start()
@@ -82,7 +79,6 @@ class SmartAirQualitySensor:
         log.info(f"Local TZ offset: {LOCAL_TZ_OFFSET_HOURS}h")
         log.info(f"Init at {self.location} ({self.latitude},{self.longitude}), elev {self.elevation} m")
 
-    # -------------------- Weather & events --------------------
     def _simulate_weather(self):
         opts = ['sunny', 'cloudy', 'rainy', 'windy', 'foggy']
         self._weather_bias += random.uniform(-0.15, 0.15)
@@ -116,25 +112,25 @@ class SmartAirQualitySensor:
                 d['pm25'] *= 3.0; d['pm10'] *= 3.0; d['co2'] += 40
         return d
 
-    # -------------------- Temperature model --------------------
+   
     def _month_bounds(self, dt):
         tmin, tmax = self.month_ranges[dt.month]
-        # simple elevation lapse rate: ~ -0.65 °C / 100 m vs sea level
+       
         lapse = -0.0065 * self.elevation
         return tmin + lapse, tmax + lapse
 
     def _simulate_temperature_base(self, now_utc):
-        # Align daily peak to 15:00 local time using a fixed tz offset knob
+       
         local = now_utc + timedelta(hours=LOCAL_TZ_OFFSET_HOURS)
         tmin, tmax = self._month_bounds(local)
         avg = (tmin + tmax) / 2.0
         amp = (tmax - tmin) / 2.0
 
         hour = local.hour + local.minute / 60.0
-        # Smooth daily curve: peak ~15:00, min ~03:00
+      
         daily = amp * math.sin((hour - 15) * math.pi / 12)
 
-        # gentle multi-day drift + short-term noise
+      
         drift = random.uniform(-0.25, 0.25)
         noise = random.uniform(-0.6, 0.6)
 
@@ -142,14 +138,14 @@ class SmartAirQualitySensor:
         return max(tmin, min(tmax, temp))
 
     def _calibrate_temperature(self, model_temp):
-        # constant bias/gain
+       
         temp = (model_temp + CALIB_TEMP_BIAS) * CALIB_TEMP_GAIN
 
-        # EMA toward REAL_TEMP_HINT if provided
+    
         if REAL_TEMP_HINT:
             try:
                 hint = float(REAL_TEMP_HINT)
-                # update bias so that (temp + ema_bias) approaches hint
+              
                 error = hint - temp
                 self._ema_bias = max(-EMA_MAX_ABS, min(EMA_MAX_ABS, self._ema_bias + EMA_ALPHA * error))
                 temp = temp + self._ema_bias
@@ -164,7 +160,7 @@ class SmartAirQualitySensor:
             base += 10
         return round(max(0.0, min(100.0, base + random.uniform(-5, 5))), 1)
 
-    # -------------------- Generate one record --------------------
+   
     def generate_data(self):
         self._simulate_weather()
         now = datetime.now(timezone.utc)
@@ -182,7 +178,7 @@ class SmartAirQualitySensor:
             "location": self.location,
             "latitude": self.latitude,
             "longitude": self.longitude,
-            "timestamp": now.isoformat(),  # UTC with offset
+            "timestamp": now.isoformat(), 
             "temperature": float(temperature),
             "humidity": float(humidity),
             "pm25": round(pm25, 1),
@@ -201,7 +197,7 @@ class SmartAirQualitySensor:
         self.state.update({k: data[k] for k in ["pm25", "pm10", "co2", "temperature", "humidity"]})
         return data
 
-    # -------------------- Main loop --------------------
+  
     def run(self, interval=5):
         log.info(f"Running in {self.location} (TZ offset {LOCAL_TZ_OFFSET_HOURS}h) …")
         if REAL_TEMP_HINT:

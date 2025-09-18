@@ -8,26 +8,24 @@ from typing import List, Dict, Any, Optional
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
 
-# -------------- Config via environment variables -----------------
+
 BOOTSTRAP      = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")
 TOPIC          = os.getenv("KAFKA_TOPIC", "sensor-data")
 LOCATION       = os.getenv("SENSOR_LOCATION", "Pristina")
 BASE_LAT       = float(os.getenv("SENSOR_LAT", 42.6629))
 BASE_LON       = float(os.getenv("SENSOR_LON", 21.1655))
-SEND_INTERVAL  = float(os.getenv("SEND_INTERVAL_SEC", "5"))       # seconds
-GPS_JITTER_M   = float(os.getenv("GPS_JITTER_METERS", "30"))      # ~random walk
-SEED           = os.getenv("SIM_SEED")                             # reproducible runs
-EVENT_PROB     = float(os.getenv("EVENT_PROB", "0.02"))            # per tick: chance to *start* event
-EVENT_MEAN_S   = float(os.getenv("EVENT_MEAN_DURATION_SEC", "15")) # avg duration
-DEVICE_COUNT   = int(os.getenv("DEVICE_COUNT", "1"))               # multiple virtual devices
+SEND_INTERVAL  = float(os.getenv("SEND_INTERVAL_SEC", "5"))       
+GPS_JITTER_M   = float(os.getenv("GPS_JITTER_METERS", "30"))      
+SEED           = os.getenv("SIM_SEED")                             
+EVENT_PROB     = float(os.getenv("EVENT_PROB", "0.02"))            
+EVENT_MEAN_S   = float(os.getenv("EVENT_MEAN_DURATION_SEC", "15")) 
+DEVICE_COUNT   = int(os.getenv("DEVICE_COUNT", "1"))               
 LOG_LEVEL      = os.getenv("LOG_LEVEL", "INFO").upper()
 
-# -------------- Logging ------------------------------------------
 logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO),
                     format="%(asctime)s - %(levelname)s - %(message)s")
 log = logging.getLogger("simulator")
 
-# -------------- Helpers ------------------------------------------
 _run = True
 def _graceful(*_):
     global _run
@@ -39,15 +37,14 @@ def clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
 def meters_to_deg_latlon(d_meters):
-    # ~ rough conversion (valid near Kosovo latitudes)
+   
     deg_lat = d_meters / 111_320.0
     deg_lon = d_meters / (111_320.0 * math.cos(math.radians(BASE_LAT)))
     return deg_lat, deg_lon
 
-# -------------- Weather & physics-ish model ----------------------
 WEATHERS = ("sunny","cloudy","rainy","windy","foggy")
 def choose_weather(hour_utc: int) -> str:
-    # simple daily pattern; nights more foggy, midday more sunny/windy
+  
     r = random.random()
     if 0 <= hour_utc < 6:
         return "foggy" if r < 0.45 else ("cloudy" if r < 0.75 else "rainy")
@@ -58,38 +55,35 @@ def choose_weather(hour_utc: int) -> str:
     return "cloudy" if r < 0.5 else ("rainy" if r < 0.7 else "foggy")
 
 def diurnal_base(hour_utc: int) -> float:
-    # temperature baseline: min at ~05:00, max at ~15:00
-    # range 0..1
+    
     return 0.5 + 0.5*math.sin((hour_utc - 5)/24.0 * 2*math.pi)
 
 def simulate_sample(t: datetime, device_state: Dict[str, Any]) -> Dict[str, Any]:
     hour = t.hour
     weather = choose_weather(hour)
 
-    # Temperature (°C):  -2..12 winter-ish baseline + daily swing 5..15
-    # For simplicity, center around 7..22 depending on diurnal_base
+  
     base = diurnal_base(hour)
     temperature = 7 + 15*base + random.uniform(-1.2, 1.2)
 
-    # Humidity (%): inverse-ish to temperature plus weather effect
+
     humidity = clamp(85 - 25*base + random.uniform(-5, 5), 30, 98)
     if weather == "rainy": humidity = clamp(humidity + 12, 40, 100)
     if weather == "foggy": humidity = clamp(humidity + 8,  40, 100)
     if weather == "sunny": humidity = clamp(humidity - 6,  25, 95)
 
-    # Wind
+  
     wind_speed = clamp(
         (2 if weather in ("foggy","rainy") else 5) + random.uniform(-1.5, 4.5),
         0.0, 28.0
     )
     wind_direction = int(random.uniform(0, 360))
 
-    # Background PM & CO2 influenced by weather and wind
     pm25 = 8 + 20*(1-base) + (6 if weather in ("foggy","rainy","cloudy") else -3) + random.uniform(-3, 3)
     pm10 = pm25 * random.uniform(1.6, 2.8)
     co2  = 420 + 50*(1-base) + (35 if weather in ("foggy","rainy") else -10) + random.uniform(-10, 12)
 
-    # Small location drift (random walk within ~GPS_JITTER_M)
+ 
     if device_state.get("lat") is None:
         device_state["lat"] = BASE_LAT + meters_to_deg_latlon(random.uniform(-GPS_JITTER_M, GPS_JITTER_M))[0]
         device_state["lon"] = BASE_LON + meters_to_deg_latlon(random.uniform(-GPS_JITTER_M, GPS_JITTER_M))[1]
@@ -98,22 +92,20 @@ def simulate_sample(t: datetime, device_state: Dict[str, Any]) -> Dict[str, Any]
         device_state["lat"] = clamp(device_state["lat"] + dlat, BASE_LAT - 0.02, BASE_LAT + 0.02)
         device_state["lon"] = clamp(device_state["lon"] + dlon, BASE_LON - 0.02, BASE_LON + 0.02)
 
-    # --- Special events ---
-    # Active event state machine per device
+   
     events: List[str] = device_state.get("events", [])
-    # Chance to start an event when none active
+    
     if not events and random.random() < EVENT_PROB:
         events = [random.choices(["wildfire","industrial_spill","traffic_jam"], weights=[0.5,0.3,0.2])[0]]
         device_state["event_until"] = t.timestamp() + random.expovariate(1.0 / max(1.0, EVENT_MEAN_S))
         log.info("Event triggered: %s", events[0])
-    # End event when time is up
+ 
     if events and t.timestamp() >= device_state.get("event_until", 0):
         log.info("Event resolved: %s", events[0])
         events = []
         device_state["event_until"] = None
     device_state["events"] = events
 
-    # Apply event impact
     if "wildfire" in events:
         pm25 *= random.uniform(12, 24)
         pm10 *= random.uniform(16, 30)
@@ -127,7 +119,7 @@ def simulate_sample(t: datetime, device_state: Dict[str, Any]) -> Dict[str, Any]
         pm10 *= random.uniform(2.2, 4.0)
         co2  += random.uniform(40, 90)
 
-    # Clamp to sane bounds
+  
     pm25 = clamp(pm25, 1, 800_000)
     pm10 = clamp(pm10, 5, 8_500_000)
     co2  = clamp(co2, 350, 10_000)
@@ -150,9 +142,9 @@ def simulate_sample(t: datetime, device_state: Dict[str, Any]) -> Dict[str, Any]
     }
     return rec
 
-# -------------- Kafka producer w/ retries ------------------------
+
 def build_producer() -> KafkaProducer:
-    # linger_ms & batch_size give you throughput without too much latency
+
     for attempt in range(1, 16):
         try:
             p = KafkaProducer(
@@ -171,14 +163,14 @@ def build_producer() -> KafkaProducer:
             time.sleep(2)
     raise RuntimeError("Could not connect to Kafka")
 
-# -------------- Main loop ---------------------------------------
+
 def main():
     if SEED is not None:
         random.seed(int(SEED))
         log.info("Using fixed random seed %s", SEED)
 
     prod = build_producer()
-    # support multiple virtual devices in one container
+   
     device_states = [{"lat": None, "lon": None, "events": []} for _ in range(DEVICE_COUNT)]
 
     log.info("Starting simulator: topic=%s interval=%ss devices=%d location=%s",
@@ -199,7 +191,7 @@ def main():
         prod.flush(timeout=5)
         time.sleep(SEND_INTERVAL)
 
-    # graceful shutdown stats
+  
     elapsed = max(0.001, time.time() - t0)
     log.info("Simulator stopped. Sent %d messages (%.2f msg/s).", sent, sent/elapsed)
 
